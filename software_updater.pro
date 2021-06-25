@@ -2,7 +2,7 @@ QT       += core gui xml
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
-CONFIG += c++11
+CONFIG += c++11 console
 
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
@@ -10,22 +10,24 @@ CONFIG += c++11
 
 SOURCES += \
     attributes.cpp \
+    cfgparser.cpp \
+    cfgstatemachine.cpp \
+    cfgxmlhandler.cpp \
+    element.cpp \
     main.cpp \
     mainwindow.cpp \
     operation.cpp \
-    token.cpp \
-    update.cpp \
-    xmlhandler.cpp \
-    xmlstatemachine.cpp
+    #update.cpp
 
 HEADERS += \
     attributes.h \
+    cfgparser.h \
+    cfgstatemachine.h \
+    cfgxmlhandler.h \
+    element.h \
     mainwindow.h \
     operation.h \
-    token.h \
-    update.h \
-    xmlhandler.h \
-    xmlstatemachine.h
+    #update.h
 
 FORMS += \
     mainwindow.ui

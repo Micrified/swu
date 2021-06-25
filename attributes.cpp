@@ -11,20 +11,15 @@ using namespace SWU;
 
 
 static const char *g_attr_key_str_map[ATTRIBUTE_KEY_ENUM_MAX] = {
-    [ATTRIBUTE_KEY_PRODUCT]     = "product",
-    [ATTRIBUTE_KEY_VERSION]     = "version",
-    [ATTRIBUTE_KEY_BUILD_ARCH]  = "build-arch",
-    [ATTRIBUTE_KEY_OS]          = "os",
-    [ATTRIBUTE_KEY_TYPE]        = "type",
-    [ATTRIBUTE_KEY_ROOT]        = "root",
-    [ATTRIBUTE_KEY_MD5]         = "md5",
+    [ATTRIBUTE_KEY_PATH]     = "path",
+    [ATTRIBUTE_KEY_ROOT]     = "root",
+    [ATTRIBUTE_KEY_PRODUCT]  = "product",
+    [ATTRIBUTE_KEY_PLATFORM] = "platform",
 };
 
 static const char *g_attr_val_str_map[ATTRIBUTE_VALUE_ENUM_MAX] = {
-    [ATTRIBUTE_VALUE_FILE]      = "File",
-    [ATTRIBUTE_VALUE_DIRECTORY] = "Directory",
-    [ATTRIBUTE_VALUE_MEDIA]     = "Media",
-    [ATTRIBUTE_VALUE_SYSTEM]    = "System",
+    [ATTRIBUTE_VALUE_REMOTE]    = "Remote",
+    [ATTRIBUTE_VALUE_TARGET]    = "Target"
 };
 
 

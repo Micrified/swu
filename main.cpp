@@ -1,28 +1,33 @@
 #include "mainwindow.h"
-#include "xmlhandler.h"
-#include "operation.h"
-#include "token.h"
-#include "update.h"
+#include "cfgxmlhandler.h"
+//#include "operation.h"
+#include "element.h"
+//#include "update.h"
 #include <QApplication>
 #include <QtXml>
 
-std::unique_ptr<SWU::Update> parseSoftwareUpdate (const char *filename)
+int parseSoftwareUpdate (const char *filename)
 {
     FILE *file_handle;
     QFile file;
     QXmlInputSource inputSource;
     QXmlSimpleReader reader;
-    XMLHandler handler;
+    ConfigXMLHandler handler;
 
     // Get file-descriptor for filename
     if (nullptr == (file_handle = fopen(filename, "r"))) {
-        return nullptr;
+        qCritical() << "Cannot find file " << QString(filename) << Qt::endl;
+        return -1;
     }
+
+    qInfo() << "File open 1 okay!";
 
     // Open for reading via QFile
     if (false == file.open(file_handle, QIODevice::ReadOnly)) {
-        return nullptr;
+        return -1;
     }
+
+    qInfo() << "File open seemed okay!";
 
     // Dump file contents into input stream
     inputSource.setData(file.readAll());
@@ -31,21 +36,30 @@ std::unique_ptr<SWU::Update> parseSoftwareUpdate (const char *filename)
     reader.setContentHandler(&handler);
     reader.parse(inputSource);
 
+    QVector<std::shared_ptr<SWU::Element>> elements = handler.elementStack();
+    for (auto e : elements) {
+        qCritical() << e->description();
+    }
+
+    if (handler.parsed()) {
+      qInfo() << "Parse succeeded!";
+    }
+
     // Build software update from token stack
-    std::unique_ptr<SWU::Update> swupdate(new SWU::Update(handler.tokenStack()));
+  //  std::unique_ptr<SWU::Update> swupdate(new SWU::Update(handler.tokenStack()));
 
     // Close the file
     file.close();
     if (0 != fclose(file_handle)) {
-        return nullptr;
+        return -1;
     }
 
-    return swupdate;
+    return 0;
 }
 
 int main(int argc, char *argv[])
 {
-    std::unique_ptr<SWU::Update> swupdate = nullptr;
+    int check = -1;
 
     // Check arguments
     if (argc <= 1) {
@@ -54,7 +68,7 @@ int main(int argc, char *argv[])
     }
 
     // Parse the XML into the update class
-    if (nullptr == (swupdate = parseSoftwareUpdate(argv[1]))) {
+    if (-1 == (check = parseSoftwareUpdate(argv[1]))) {
         qCritical() << "Unable to parse software update XML file provided!";
         return EXIT_FAILURE;
     }

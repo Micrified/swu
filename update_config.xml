@@ -1,16 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<swupdate product="Tradinco HMI">
-    <media>
-        <media-path>/foo</media-path>
-        <archive-match>update*.tgz</archive-match>
-    </media>
+<configuration product="Tradinco HMI" platform="linux">
+    <resource-uri>/media/usb*/update*.tgz</resource-uri>
 
-    <update-validate>
+    <validate>
         <file>frontend</file>
         <file>backend</file>
-        <directory>languages/frontend<directory>
-        <directory>languages/backend<directory>
-    </update-validate>
+        <directory>languages/frontend</directory>
+        <directory>languages/backend</directory>
+    </validate>
 
     <backup path="/tmp/backup">
         <file>/opt/tradinco-hmi/frontend</file>
@@ -19,19 +16,19 @@
         <directory>/var/appdata/languages/backend</directory>
     </backup>
 
-    <update>
+    <operations>
         <copy>
-            <file root="Media">backend</file>
-            <to-directory root="System">/etc</to-directory>
+            <from root="Remote">backend</from>
+            <to root="Target">/etc</to>
         </copy>
         <copy>
-            <directory root="Media">languages/backend</directory>
-            <to-directory root="System">/etc/backend/languages</to-directory>
+            <from root="Remote">languages/backend/*</from>
+            <to root="Target">/etc/backend/languages</to>
         </copy>
         <copy>
-            <directory root="Media">languages/frontend</directory>
-            <to-directory root="System">/etc/frontend/languages</to-directory>
+            <from root="Remote">languages/frontend/*</from>
+            <to root="Target">/etc/frontend/languages</to>
         </copy>
-        <remove root="System" type="File">/appdata/appcopy/swupdate</remove>
-    </update>
-</swupdate>
+        <remove root="Target">/appdata/appcopy/swupdate/*</remove>
+    </operations>
+</configuration>

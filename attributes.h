@@ -13,24 +13,21 @@ namespace SWU {
 
 /* Enumeration of all possible attribute keys */
 enum attribute_key_t {
-    ATTRIBUTE_KEY_PRODUCT = 0,
-    ATTRIBUTE_KEY_VERSION,
-    ATTRIBUTE_KEY_BUILD_ARCH,
-    ATTRIBUTE_KEY_OS,
-    ATTRIBUTE_KEY_TYPE,
+    ATTRIBUTE_KEY_PATH = 0,
     ATTRIBUTE_KEY_ROOT,
-    ATTRIBUTE_KEY_MD5,
+    ATTRIBUTE_KEY_PRODUCT,
+    ATTRIBUTE_KEY_PLATFORM,
 
+    /* Size */
     ATTRIBUTE_KEY_ENUM_MAX
 };
 
 /* Enumeration of all possible attribute values */
 enum attribute_value_t {
-    ATTRIBUTE_VALUE_FILE = 0,
-    ATTRIBUTE_VALUE_DIRECTORY,
-    ATTRIBUTE_VALUE_MEDIA,
-    ATTRIBUTE_VALUE_SYSTEM,
+    ATTRIBUTE_VALUE_REMOTE = 0,
+    ATTRIBUTE_VALUE_TARGET,
 
+    /* Size */
     ATTRIBUTE_VALUE_ENUM_MAX
 };
 
@@ -38,6 +35,7 @@ enum attribute_value_t {
 struct attribute_kv_pair {
     attribute_key_t key;
     attribute_value_t val;
+    QString lexeme;
 };
 
 

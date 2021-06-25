@@ -1,5 +1,5 @@
-#ifndef XMLHANDLER_H
-#define XMLHANDLER_H
+#ifndef CFGXMLHANDLER_H
+#define CFGXMLHANDLER_H
 
 /*\
  * The XMLHandler class implements the QXmlDefaultHandler interface.
@@ -18,8 +18,8 @@
 
 
 #include <QtXml>
-#include "xmlstatemachine.h"
-#include "token.h"
+#include "cfgstatemachine.h"
+#include "element.h"
 
 /*
  *******************************************************************************
@@ -28,8 +28,8 @@
 */
 
 
-// Maps tokens (transitions) to a human readable (string) form
-extern const char *g_map_transition_str[];
+// Array-designation map: Token to lexeme
+extern QString g_token_lexeme_map[];
 
 /*
  *******************************************************************************
@@ -37,17 +37,17 @@ extern const char *g_map_transition_str[];
  *******************************************************************************
 */
 
-class XMLHandler : public QXmlDefaultHandler {
+class ConfigXMLHandler : public QXmlDefaultHandler {
 private:
 
     // Custom state machine for parsing the file
     SWU::Machine d_state_machine;
 
-    // Token collection stack
-    QVector<std::shared_ptr<SWU::Token>> d_token_stack;
+    // Element collection stack
+    QVector<std::shared_ptr<SWU::Element>> d_element_stack;
 
-    // Token scope stack
-    QVector<std::weak_ptr<SWU::Token>> d_scope_stack;
+    // Element scope stack
+    QVector<std::weak_ptr<SWU::Element>> d_scope_stack;
 
     // Parse bool
     bool d_parsed;
@@ -57,8 +57,8 @@ protected:
 public:
 
     /* Constructor/Destructor */
-    XMLHandler ();
-    ~XMLHandler () = default;
+    ConfigXMLHandler ();
+    ~ConfigXMLHandler () = default;
 
     /* Overridden methods */
     bool startDocument () override;
@@ -75,7 +75,7 @@ public:
 
     /* New methods */
     bool parsed ();
-    const QVector<std::shared_ptr<SWU::Token>>& tokenStack();
+    const QVector<std::shared_ptr<SWU::Element>>& elementStack();
 };
 
-#endif // XMLHANDLER_H
+#endif // CFGXMLHANDLER_H
