@@ -1,6 +1,9 @@
 #include "cfgparser.h"
 using namespace SWU;
 
+// Array-designation map: Token to lexeme
+extern QString g_token_lexeme_map[];
+
 std::shared_ptr<CFGElement> next(QVector<std::shared_ptr<CFGElement>> &elements)
 {
     std::shared_ptr<CFGElement> e = nullptr;
@@ -11,18 +14,25 @@ std::shared_ptr<CFGElement> next(QVector<std::shared_ptr<CFGElement>> &elements)
     return e;
 }
 
-bool requireExactAttributes (std::shared_ptr<CFGElement> element,
+bool Parser::hasAttributeKeys (std::shared_ptr<CFGElement> element,
                              QVector<attribute_kp_pair> key_pointer_pairs)
 {
     off_t matched = 0;
+    Attributes a = Attributes::get_instance();
+
     for (auto keyval : key_pointer_pairs) {
 
         // Extract kv-pair
         attribute_kv_pair *kvpair = element->attribute_index(keyval.key);
 
+        // Push required onto stack
+        d_parse_stack.push_back(a.key_to_str(keyval.key));
+
         // If the attribute index is not valid - move on
         if (ATTRIBUTE_IS_UNSET(kvpair)) {
-            continue;
+            break;
+        } else {
+            d_parse_stack.pop_back();
         }
 
         // Else copy the value to the given pointer
@@ -35,11 +45,13 @@ bool requireExactAttributes (std::shared_ptr<CFGElement> element,
     return matched == key_pointer_pairs.length();
 }
 
-off_t attributeInSet (QString raw_attribute, QVector<attribute_value_t> values) {
+off_t Parser::attributeValueInSet (QString raw_attribute, QVector<attribute_value_t> values) {
     Attributes a = Attributes::get_instance();
     attribute_value_t value = a.value(raw_attribute);
+    d_parse_stack.push_back(raw_attribute);
     for (off_t i = 0; i < values.length(); ++i) {
         if (values[i] == value) {
+            d_parse_stack.pop_back();
             return i;
         }
     }
@@ -62,14 +74,14 @@ ParseStatus Parser::status()
 
 ParseStatus Parser::acceptConfiguration(QVector<std::shared_ptr<CFGElement>>& elements)
 {
-    qCritical() << __FUNCTION__ << ": ()";
     ParseStatus retval = PARSE_OK;
     std::shared_ptr<CFGElement> config = nullptr;
 
     // First stack element is the configuration
     if ((config = next(elements)) == nullptr) {
-        qCritical() << __FUNCTION__ << ": couldn't find config element!";
         return PARSE_INVALID_ELEMENT;
+    } else {
+        d_parse_stack.push_back(g_token_lexeme_map[config->token()]);
     }
 
     // Extract expected attributes
@@ -77,16 +89,16 @@ ParseStatus Parser::acceptConfiguration(QVector<std::shared_ptr<CFGElement>>& el
         {ATTRIBUTE_KEY_PLATFORM, &d_platform},
         {ATTRIBUTE_KEY_PRODUCT,  &d_product}
     });
-    if (!requireExactAttributes(config, req_atts)) {
-        qCritical() << __FUNCTION__ << ": invalid attributes!";
+    if (!hasAttributeKeys(config, req_atts)) {
         return PARSE_INVALID_ATTRIBUTE_KEY;
     }
 
     // While there remain more elements on the stack
-    while (elements.length() > 0 && retval == PARSE_OK) {
-        std::shared_ptr<CFGElement> head = elements.front();
+    while (elements.length() > 0) {
+        std::shared_ptr<CFGElement> element = elements.front();
+        d_parse_stack.push_back(g_token_lexeme_map[element->token()]);
 
-        switch (head->token()) {
+        switch (element->token()) {
         case T_RESOURCE_URI_OPEN:
             retval = acceptResourceURI(elements);
             break;
@@ -103,6 +115,17 @@ ParseStatus Parser::acceptConfiguration(QVector<std::shared_ptr<CFGElement>>& el
         default:
             retval = PARSE_INVALID_ELEMENT;
         }
+
+        if (retval != PARSE_OK) {
+            break;
+        } else {
+            d_parse_stack.pop_back();
+        }
+    }
+
+    // Pop only on non-error
+    if (retval == PARSE_OK) {
+        d_parse_stack.pop_back();
     }
 
     return retval;
@@ -111,7 +134,6 @@ ParseStatus Parser::acceptConfiguration(QVector<std::shared_ptr<CFGElement>>& el
 ParseStatus Parser::acceptFile (QVector<std::shared_ptr<CFGElement>>& elements,
                               QString *value_p)
 {
-    qCritical() << __FUNCTION__ << ": ()";
     ParseStatus retval = PARSE_OK;
     Q_ASSERT(value_p != nullptr);
 
@@ -127,7 +149,6 @@ ParseStatus Parser::acceptFile (QVector<std::shared_ptr<CFGElement>>& elements,
 ParseStatus Parser::acceptDirectory (QVector<std::shared_ptr<CFGElement>>& elements,
                                    QString *value_p)
 {
-    qCritical() << __FUNCTION__ << ": ()";
     ParseStatus retval = PARSE_OK;
     Q_ASSERT(value_p != nullptr);
 
@@ -142,18 +163,29 @@ ParseStatus Parser::acceptDirectory (QVector<std::shared_ptr<CFGElement>>& eleme
 
 ParseStatus Parser::acceptBackup (QVector<std::shared_ptr<CFGElement>>& elements)
 {
-    qCritical() << __FUNCTION__ << ": ()";
     ParseStatus retval = PARSE_OK;
     QString temp_path_value = nullptr;
+    std::shared_ptr<CFGElement> backup;
 
     // Pop the lead element off the stack
-    std::shared_ptr<CFGElement> backup = next(elements);
-    Q_UNUSED(backup);
+    if ((backup = next(elements)) == nullptr) {
+        return PARSE_INVALID_ELEMENT;
+    }
+
+    // Extract expected attributes
+    QVector<attribute_kp_pair> req_atts = QVector<attribute_kp_pair>({
+        {ATTRIBUTE_KEY_PATH, &d_backup_path}
+    });
+    if (!hasAttributeKeys(backup, req_atts)) {
+        return PARSE_INVALID_ATTRIBUTE_KEY;
+    }
 
     // While we encounter elements of type: {file, directory}
     bool more = true;
-    while (elements.length() > 0 && more && retval == PARSE_OK) {
+    while (elements.length() > 0 && more) {
         std::shared_ptr<CFGElement> element = elements.front();
+        d_parse_stack.push_back(g_token_lexeme_map[element->token()]);
+
         switch (element->token()) {
         case T_FILE_OPEN:
             retval = acceptFile(elements, &temp_path_value);
@@ -167,24 +199,41 @@ ParseStatus Parser::acceptBackup (QVector<std::shared_ptr<CFGElement>>& elements
             more = false;
             break;
         }
+
+        if (retval != PARSE_OK) {
+            break;
+        } else {
+            d_parse_stack.pop_back();
+        }
     }
+
+    // Pop only on non-error
+    if (retval == PARSE_OK) {
+        d_parse_stack.pop_back();
+    }
+
     return retval;
 }
 
 ParseStatus Parser::acceptValidate (QVector<std::shared_ptr<CFGElement>>& elements)
 {
-    qCritical() << __FUNCTION__ << ": ()";
     ParseStatus retval = PARSE_OK;
     QString temp_path_value = nullptr;
+    std::shared_ptr<CFGElement> validate;
 
     // Pop the lead element off the stack
-    std::shared_ptr<CFGElement> validate = next(elements);
-    Q_UNUSED(validate);
+    if ((validate = next(elements)) == nullptr) {
+        return PARSE_INVALID_ELEMENT;
+    } else {
+        d_parse_stack.push_back(g_token_lexeme_map[validate->token()]);
+    }
 
     // While we encounter elements of type: {file, directory}
     bool more = true;
     while (elements.length() > 0 && more) {
         std::shared_ptr<CFGElement> element = elements.front();
+        d_parse_stack.push_back(g_token_lexeme_map[element->token()]);
+
         switch (element->token()) {
         case T_FILE_OPEN:
             retval = acceptFile(elements, &temp_path_value);
@@ -198,13 +247,25 @@ ParseStatus Parser::acceptValidate (QVector<std::shared_ptr<CFGElement>>& elemen
             more = false;
             break;
         }
+
+        if (retval != PARSE_OK) {
+            break;
+        } else {
+            d_parse_stack.pop_back();
+        }
+
     }
+
+    // Pop only on non-error
+    if (retval == PARSE_OK) {
+        d_parse_stack.pop_back();
+    }
+
     return retval;
 }
 
 ParseStatus Parser::acceptResourceURI(QVector<std::shared_ptr<CFGElement>>& elements)
 {
-    qCritical() << __FUNCTION__ << ": ()";
     ParseStatus retval = PARSE_OK;
 
     // Pop the lead element off the stack
@@ -219,15 +280,19 @@ ParseStatus Parser::acceptResourceURI(QVector<std::shared_ptr<CFGElement>>& elem
 ParseStatus Parser::acceptOperations(QVector<std::shared_ptr<CFGElement>>& elements)
 {
     ParseStatus retval = PARSE_OK;
-    qCritical() << __FUNCTION__ << ": ()";
+    std::shared_ptr<CFGElement> operations;
+
     // Pop the lead element off the stack
-    std::shared_ptr<CFGElement> operations = next(elements);
-    Q_UNUSED(operations);
+    if ((operations = next(elements)) == nullptr) {
+        return PARSE_INVALID_ELEMENT;
+    }
 
     // While we encounter elements of type: {copy, remove}
     bool more = true;
-    while (elements.length() > 0 && more && retval == PARSE_OK) {
+    while (elements.length() > 0 && more) {
         std::shared_ptr<CFGElement> element = elements.front();
+        d_parse_stack.push_back(g_token_lexeme_map[element->token()]);
+
         switch (element->token()) {
         case T_COPY_OPEN:
             retval = acceptCopy(elements);
@@ -239,29 +304,42 @@ ParseStatus Parser::acceptOperations(QVector<std::shared_ptr<CFGElement>>& eleme
             more = false;
             break;
         }
+
+        if (retval != PARSE_OK) {
+            break;
+        } else {
+            d_parse_stack.pop_back();
+        }
     }
+
+    // Pop only on non-error
+    if (retval == PARSE_OK) {
+        d_parse_stack.pop_back();
+    }
+
     return retval;
 }
 
 ParseStatus Parser::acceptCopy(QVector<std::shared_ptr<CFGElement>>& elements)
 {
-    qCritical() << __FUNCTION__ << ": ()";
     ParseStatus retval = PARSE_OK;
+    std::shared_ptr<CFGElement> copy;
     CFGRootType from_root = ROOT_TYPE_ENUM_MAX, to_root = ROOT_TYPE_ENUM_MAX;
     QString from_path = nullptr, to_path = nullptr;
     QString from_root_value = nullptr, to_root_value = nullptr;
     off_t i = -1;
 
     // Pop the lead element off the stack
-    std::shared_ptr<CFGElement> copy = next(elements);
-    Q_UNUSED(copy);
+    if ((copy = next(elements)) == nullptr) {
+        return PARSE_INVALID_ELEMENT;
+    }
 
     // Require element: from
+    d_parse_stack.push_back(g_token_lexeme_map[elements.front()->token()]);
     if (elements.front()->token() != T_FROM_OPEN) {
         return PARSE_INVALID_ELEMENT;
     }
     if ((retval = acceptFrom(elements, &from_root_value, &from_path)) != PARSE_OK) {
-        qCritical() << __FUNCTION__ << ": acceptFrom() fault";
         return retval;
     }
 
@@ -275,30 +353,29 @@ ParseStatus Parser::acceptCopy(QVector<std::shared_ptr<CFGElement>>& elements)
     CFGRootType valid_root_index[] = {ROOT_TYPE_REMOTE, ROOT_TYPE_TARGET};
 
     // Validate: from
-    if ((i = attributeInSet(from_root_value, valid_attribute_index)) == -1) {
-        qCritical() << __FUNCTION__ << ": invalid attribute for <from> root";
+    if ((i = attributeValueInSet(from_root_value, valid_attribute_index)) == -1) {
         return PARSE_INVALID_ATTRIBUTE_VALUE;
     } else {
         from_root = valid_root_index[i];
     }
+    d_parse_stack.pop_back();
 
     // Require element: to
+    d_parse_stack.push_back(g_token_lexeme_map[elements.front()->token()]);
     if (elements.front()->token() != T_TO_OPEN) {
-        qCritical() << __FUNCTION__ << ": expected <to> but didn't find it";
         return PARSE_INVALID_ELEMENT;
     }
     if ((retval = acceptTo(elements, &to_root_value, &to_path)) != PARSE_OK) {
-        qCritical() << __FUNCTION__ << ": unable to parse <to>";
         return retval;
     }
 
     // Validate: to
-    if ((i = attributeInSet(to_root_value, valid_attribute_index)) == -1) {
-        qCritical() << __FUNCTION__ << ": invalid attribute for <to> root";
+    if ((i = attributeValueInSet(to_root_value, valid_attribute_index)) == -1) {
         return PARSE_INVALID_ATTRIBUTE_VALUE;
     } else {
         to_root = valid_root_index[i];
     }
+    d_parse_stack.pop_back();
 
     // Push copy operation
     d_copy_operations.push_back({from_root, to_root, from_path, to_path});
@@ -310,7 +387,6 @@ ParseStatus Parser::acceptFrom(QVector<std::shared_ptr<CFGElement>>& elements,
                              QString *root_p,
                              QString *value_p)
 {
-    qCritical() << __FUNCTION__ << ": ()";
     ParseStatus retval = PARSE_OK;
     Q_ASSERT(root_p != nullptr);
     Q_ASSERT(value_p != nullptr);
@@ -322,8 +398,7 @@ ParseStatus Parser::acceptFrom(QVector<std::shared_ptr<CFGElement>>& elements,
     QVector<attribute_kp_pair> req_atts = QVector<attribute_kp_pair>({
         {ATTRIBUTE_KEY_ROOT, root_p}
     });
-    if (!requireExactAttributes(from, req_atts)) {
-        qCritical() << __FUNCTION__ << ": could not find required attributes";
+    if (!hasAttributeKeys(from, req_atts)) {
         return PARSE_INVALID_ATTRIBUTE_KEY;
     }
 
@@ -337,7 +412,6 @@ ParseStatus Parser::acceptTo(QVector<std::shared_ptr<CFGElement>>& elements,
                            QString *root_p,
                            QString *value_p)
 {
-    qCritical() << __FUNCTION__ << ": ()";
     ParseStatus retval = PARSE_OK;
     Q_ASSERT(root_p != nullptr);
     Q_ASSERT(value_p != nullptr);
@@ -349,7 +423,7 @@ ParseStatus Parser::acceptTo(QVector<std::shared_ptr<CFGElement>>& elements,
     QVector<attribute_kp_pair> req_atts = QVector<attribute_kp_pair>({
         {ATTRIBUTE_KEY_ROOT, root_p}
     });
-    if (!requireExactAttributes(to, req_atts)) {
+    if (!hasAttributeKeys(to, req_atts)) {
         return PARSE_INVALID_ATTRIBUTE_KEY;
     }
 
@@ -361,7 +435,6 @@ ParseStatus Parser::acceptTo(QVector<std::shared_ptr<CFGElement>>& elements,
 
 ParseStatus Parser::acceptRemove(QVector<std::shared_ptr<CFGElement>>& elements)
 {
-    qCritical() << __FUNCTION__ << ": ()";
     ParseStatus retval = PARSE_OK;
     QString root_value_raw = nullptr;
     attribute_value_t root_value = ATTRIBUTE_VALUE_ENUM_MAX;
@@ -375,7 +448,7 @@ ParseStatus Parser::acceptRemove(QVector<std::shared_ptr<CFGElement>>& elements)
     QVector<attribute_kp_pair> req_atts = QVector<attribute_kp_pair>({
         {ATTRIBUTE_KEY_ROOT, &root_value_raw}
     });
-    if (!requireExactAttributes(remove, req_atts)) {
+    if (!hasAttributeKeys(remove, req_atts)) {
         return PARSE_INVALID_ATTRIBUTE_KEY;
     }
 
@@ -394,4 +467,37 @@ ParseStatus Parser::acceptRemove(QVector<std::shared_ptr<CFGElement>>& elements)
     d_remove_operations.push_back({root_type, remove->value()});
 
     return retval;
+}
+
+QString Parser::fault()
+{
+    // If not in an error state, return null
+    if (PARSE_OK == d_status) {
+        return nullptr;
+    }
+
+    // Otherwise build the fault stack
+    QString description;
+    switch (d_status) {
+    case PARSE_INVALID_ELEMENT:
+        description = QString("Invalid element: ");
+        break;
+    case PARSE_INVALID_ATTRIBUTE_KEY:
+        description = QString("Missing attribute key: ");
+        break;
+    case PARSE_INVALID_ATTRIBUTE_VALUE:
+        description = QString("Invalid attribute value: ");
+        break;
+    default:
+        description = QString("Parse anomaly: ");
+        break;
+    }
+
+    for (off_t i = d_parse_stack.length() - 1; i >= 0; --i) {
+        description += d_parse_stack[i];
+        if (i > 0) {
+            description += " in\n\t";
+        }
+    }
+    return description + "\n";
 }

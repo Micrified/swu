@@ -7,6 +7,7 @@
 //#include "update.h"
 #include <QApplication>
 #include <QtXml>
+#include <iostream>
 
 int parseSoftwareUpdate (const char *filename)
 {
@@ -59,7 +60,8 @@ int parseSoftwareUpdate (const char *filename)
     // Run the parser
     SWU::Parser parser(cfg_elements);
     if (parser.status() != SWU::PARSE_OK) {
-        qCritical() << "Unable to parse the configuration: ";
+        qCritical() << "Unable to parse the configuration:\n";
+        std::cerr << parser.fault().toStdString();
     } else {
         qCritical() << "The parser said it was successful!";
     }
