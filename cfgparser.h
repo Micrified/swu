@@ -6,22 +6,77 @@
 
 namespace SWU {
 
+enum CFGRootType {
+    ROOT_TYPE_REMOTE,
+    ROOT_TYPE_TARGET,
+
+    /* Size */
+    ROOT_TYPE_ENUM_MAX
+};
+
+union CFGData {
+    struct configuration {
+        QString product, platform;
+    };
+    struct resource_uri {
+        QString uri;
+    };
+    struct backup {
+        QString backup_path;
+    };
+    struct file {
+        QString file_path;
+    };
+    struct directory {
+        QString directory_path;
+    };
+    struct copy {
+        QString from_path, to_path;
+    };
+    struct remove {
+        QString remove_path;
+    };
+};
+
+enum ParseStatus {
+    PARSE_OK,
+
+    /* Size */
+    PARSE_ENUM_MAX
+};
+
+
+struct CFGResult {
+    ParseStatus status;
+    CFGData data;
+};
+
+#define DEFAULT_CFG_RESULT CFGResult {PARSE_ENUM_MAX, CFGData{}}
+
 class Parser
 {
-public:
-    Parser();
+private:
+    ParseStatus d_status;
+    QString d_product, d_platform;
+    QString d_resource_uri;
+    QString d_backup_path;
+    QVector<QString> d_backup_file_paths, d_backup_directory_paths;
+    QVector<QPair<QString,QString>> d_copy_operations;
+    QVector<QString> d_remove_operations;
 
-    static bool acceptConfiguration(std::shared_ptr<Element> element);
-    static bool acceptFile (std::shared_ptr<Element> element);
-    static bool acceptDirectory (std::shared_ptr<Element> element);
-    static bool acceptBackup (std::shared_ptr<Element> element);
-    static bool acceptValidate (std::shared_ptr<Element> element);
-    static bool acceptResourceURI(std::shared_ptr<Element> element);
-    static bool acceptOperations(std::shared_ptr<Element> element);
-    static bool acceptCopy(std::shared_ptr<Element> element);
-    static bool acceptFrom(std::shared_ptr<Element> element);
-    static bool acceptTo(std::shared_ptr<Element> element);
-    static bool acceptRemove(std::shared_ptr<Element> element);
+    CFGResult acceptConfiguration(QVector<std::shared_ptr<SWU::Element>>& elements);
+    CFGResult acceptFile (QVector<std::shared_ptr<SWU::Element>>& elements);
+    CFGResult acceptDirectory (QVector<std::shared_ptr<SWU::Element>>& elements);
+    CFGResult acceptBackup (QVector<std::shared_ptr<SWU::Element>>& elements);
+    CFGResult acceptValidate (QVector<std::shared_ptr<SWU::Element>>& elements);
+    CFGResult acceptResourceURI(QVector<std::shared_ptr<SWU::Element>>& elements);
+    CFGResult acceptOperations(QVector<std::shared_ptr<SWU::Element>>& elements);
+    CFGResult acceptCopy(QVector<std::shared_ptr<SWU::Element>>& elements);
+    CFGResult acceptFrom(QVector<std::shared_ptr<SWU::Element>>& elements);
+    CFGResult acceptTo(QVector<std::shared_ptr<SWU::Element>>& elements);
+    CFGResult acceptRemove(QVector<std::shared_ptr<SWU::Element>>& elements);
+public:
+    Parser(const QVector<std::shared_ptr<SWU::Element>>& elements);
 };
 
 }
