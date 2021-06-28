@@ -1,8 +1,13 @@
 #ifndef CFGPARSER_H
 #define CFGPARSER_H
 
-#include "element.h"
+#include <QtDebug>
+#include <QDir>
 #include "attributes.h"
+#include "cfgelement.h"
+
+// Array-designation map: Token to lexeme
+extern QString g_token_lexeme_map[];
 
 namespace SWU {
 
@@ -14,69 +19,61 @@ enum CFGRootType {
     ROOT_TYPE_ENUM_MAX
 };
 
-union CFGData {
-    struct configuration {
-        QString product, platform;
-    };
-    struct resource_uri {
-        QString uri;
-    };
-    struct backup {
-        QString backup_path;
-    };
-    struct file {
-        QString file_path;
-    };
-    struct directory {
-        QString directory_path;
-    };
-    struct copy {
-        QString from_path, to_path;
-    };
-    struct remove {
-        QString remove_path;
-    };
-};
-
 enum ParseStatus {
     PARSE_OK,
+    PARSE_INVALID_ELEMENT,
+    PARSE_INVALID_ATTRIBUTE_KEY,
+    PARSE_INVALID_ATTRIBUTE_VALUE,
 
     /* Size */
     PARSE_ENUM_MAX
 };
 
-
-struct CFGResult {
-    ParseStatus status;
-    CFGData data;
+struct Copy {
+    CFGRootType from_root, to_root;
+    QString from_path, to_path;
 };
 
+struct Remove {
+    CFGRootType root;
+    QString path;
+};
+
+#define ERR_CFG_RESULT {PARSE_ERR, CFGData{}}
 #define DEFAULT_CFG_RESULT CFGResult {PARSE_ENUM_MAX, CFGData{}}
 
 class Parser
 {
 private:
+
+    // Status of the parser
     ParseStatus d_status;
     QString d_product, d_platform;
-    QString d_resource_uri;
+    QVector<QString> d_resource_uris;
     QString d_backup_path;
+    QVector<QString> d_validate_file_paths, d_validate_directory_paths;
     QVector<QString> d_backup_file_paths, d_backup_directory_paths;
-    QVector<QPair<QString,QString>> d_copy_operations;
-    QVector<QString> d_remove_operations;
+    QVector<Copy> d_copy_operations;
+    QVector<Remove> d_remove_operations;
 
-    CFGResult acceptConfiguration(QVector<std::shared_ptr<SWU::Element>>& elements);
-    CFGResult acceptFile (QVector<std::shared_ptr<SWU::Element>>& elements);
-    CFGResult acceptDirectory (QVector<std::shared_ptr<SWU::Element>>& elements);
-    CFGResult acceptBackup (QVector<std::shared_ptr<SWU::Element>>& elements);
-    CFGResult acceptValidate (QVector<std::shared_ptr<SWU::Element>>& elements);
-    CFGResult acceptResourceURI(QVector<std::shared_ptr<SWU::Element>>& elements);
-    CFGResult acceptOperations(QVector<std::shared_ptr<SWU::Element>>& elements);
-    CFGResult acceptCopy(QVector<std::shared_ptr<SWU::Element>>& elements);
-    CFGResult acceptFrom(QVector<std::shared_ptr<SWU::Element>>& elements);
-    CFGResult acceptTo(QVector<std::shared_ptr<SWU::Element>>& elements);
-    CFGResult acceptRemove(QVector<std::shared_ptr<SWU::Element>>& elements);
+    ParseStatus acceptConfiguration(QVector<std::shared_ptr<SWU::CFGElement>>& elements);
+    ParseStatus acceptFile (QVector<std::shared_ptr<SWU::CFGElement>>& elements,
+                          QString *value_p);
+    ParseStatus acceptDirectory (QVector<std::shared_ptr<SWU::CFGElement>>& elements,
+                               QString *value_p);
+    ParseStatus acceptBackup (QVector<std::shared_ptr<SWU::CFGElement>>& elements);
+    ParseStatus acceptValidate (QVector<std::shared_ptr<SWU::CFGElement>>& elements);
+    ParseStatus acceptResourceURI(QVector<std::shared_ptr<SWU::CFGElement>>& elements);
+    ParseStatus acceptOperations(QVector<std::shared_ptr<SWU::CFGElement>>& elements);
+    ParseStatus acceptCopy(QVector<std::shared_ptr<SWU::CFGElement>>& elements);
+    ParseStatus acceptFrom(QVector<std::shared_ptr<SWU::CFGElement>>& elements,
+                         QString *root_p, QString *value_p);
+    ParseStatus acceptTo(QVector<std::shared_ptr<SWU::CFGElement>>& elements,
+                         QString *root_p, QString *value_p);
+    ParseStatus acceptRemove(QVector<std::shared_ptr<SWU::CFGElement>>& elements);
 public:
-    Parser(const QVector<std::shared_ptr<SWU::Element>>& elements);
+    Parser(const QVector<std::shared_ptr<SWU::CFGElement>>& elements);
+    ParseStatus status();
 };
 
 }

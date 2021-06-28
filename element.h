@@ -22,6 +22,8 @@ private:
     // If successfully parsed
     bool d_ready;
 
+protected:
+
     // Parser token associated with element
     SWU::Token d_token;
 

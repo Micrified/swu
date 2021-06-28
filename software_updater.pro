@@ -10,6 +10,7 @@ CONFIG += c++11 console
 
 SOURCES += \
     attributes.cpp \
+    cfgelement.cpp \
     cfgparser.cpp \
     cfgstatemachine.cpp \
     cfgxmlhandler.cpp \
@@ -21,6 +22,7 @@ SOURCES += \
 
 HEADERS += \
     attributes.h \
+    cfgelement.h \
     cfgparser.h \
     cfgstatemachine.h \
     cfgxmlhandler.h \

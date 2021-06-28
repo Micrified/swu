@@ -2,6 +2,8 @@
 #include "cfgxmlhandler.h"
 //#include "operation.h"
 #include "element.h"
+#include "cfgelement.h"
+#include "cfgparser.h"
 //#include "update.h"
 #include <QApplication>
 #include <QtXml>
@@ -43,7 +45,25 @@ int parseSoftwareUpdate (const char *filename)
 
     if (handler.parsed()) {
       qInfo() << "Parse succeeded!";
+    } else {
+        qCritical() << "Parse failed :(";
+        return -1;
     }
+
+    // Convert to SWUElements
+    QVector<std::shared_ptr<SWU::CFGElement>> cfg_elements(elements.size());
+    for (off_t i = 0; i < elements.count(); ++i) {
+        cfg_elements[i] = std::make_shared<SWU::CFGElement>(SWU::CFGElement(elements[i]));
+    }
+
+    // Run the parser
+    SWU::Parser parser(cfg_elements);
+    if (parser.status() != SWU::PARSE_OK) {
+        qCritical() << "Unable to parse the configuration: ";
+    } else {
+        qCritical() << "The parser said it was successful!";
+    }
+
 
     // Build software update from token stack
   //  std::unique_ptr<SWU::Update> swupdate(new SWU::Update(handler.tokenStack()));

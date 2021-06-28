@@ -41,12 +41,16 @@ struct attribute_kv_pair {
 /* Attribute key-value pair, with a pointer lexeme */
 struct attribute_kp_pair {
     attribute_key_t key;
-    attribute_value_t val;
     QString *lexeme_p;
 };
 
-#define ATT_KEY(key) attribute_kv_pair{key,ATTRIBUTE_VALUE_ENUM_MAX, nullptr}
-#define ATT_END      attribute_kv_pair{ATTRIBUTE_KEY_ENUM_MAX, ATTRIBUTE_VALUE_ENUM_MAX, nullptr}
+/* Symbolic constant: unset/uninitialized attribute type */
+#define ATTRIBUTE_UNSET          attribute_kv_pair{ATTRIBUTE_KEY_ENUM_MAX, \
+                                     ATTRIBUTE_VALUE_ENUM_MAX, \
+                                     nullptr \
+                                 }
+/* Symbolic constant: returns true if a given attribute is unset */
+#define ATTRIBUTE_IS_UNSET(a)    ((a)->key == ATTRIBUTE_KEY_ENUM_MAX ? true : false)
 
 
 /*
