@@ -25,14 +25,9 @@ bool Parser::hasAttributeKeys (std::shared_ptr<CFGElement> element,
         // Extract kv-pair
         attribute_kv_pair *kvpair = element->attribute_index(keyval.key);
 
-        // Push required onto stack
-        d_parse_stack.push_back(a.key_to_str(keyval.key));
-
         // If the attribute index is not valid - move on
         if (ATTRIBUTE_IS_UNSET(kvpair)) {
             break;
-        } else {
-            d_parse_stack.pop_back();
         }
 
         // Else copy the value to the given pointer
@@ -48,10 +43,8 @@ bool Parser::hasAttributeKeys (std::shared_ptr<CFGElement> element,
 off_t Parser::attributeValueInSet (QString raw_attribute, QVector<attribute_value_t> values) {
     Attributes a = Attributes::get_instance();
     attribute_value_t value = a.value(raw_attribute);
-    d_parse_stack.push_back(raw_attribute);
     for (off_t i = 0; i < values.length(); ++i) {
         if (values[i] == value) {
-            d_parse_stack.pop_back();
             return i;
         }
     }
@@ -81,7 +74,7 @@ ParseStatus Parser::acceptConfiguration(QVector<std::shared_ptr<CFGElement>>& el
     if ((config = next(elements)) == nullptr) {
         return PARSE_INVALID_ELEMENT;
     } else {
-        d_parse_stack.push_back(g_token_lexeme_map[config->token()]);
+        d_parse_stack.push_back(config->token());
     }
 
     // Extract expected attributes
@@ -96,7 +89,7 @@ ParseStatus Parser::acceptConfiguration(QVector<std::shared_ptr<CFGElement>>& el
     // While there remain more elements on the stack
     while (elements.length() > 0) {
         std::shared_ptr<CFGElement> element = elements.front();
-        d_parse_stack.push_back(g_token_lexeme_map[element->token()]);
+        d_parse_stack.push_back(element->token());
 
         switch (element->token()) {
         case T_RESOURCE_URI_OPEN:
@@ -170,6 +163,8 @@ ParseStatus Parser::acceptBackup (QVector<std::shared_ptr<CFGElement>>& elements
     // Pop the lead element off the stack
     if ((backup = next(elements)) == nullptr) {
         return PARSE_INVALID_ELEMENT;
+    } else {
+        d_parse_stack.push_back(backup->token());
     }
 
     // Extract expected attributes
@@ -184,7 +179,7 @@ ParseStatus Parser::acceptBackup (QVector<std::shared_ptr<CFGElement>>& elements
     bool more = true;
     while (elements.length() > 0 && more) {
         std::shared_ptr<CFGElement> element = elements.front();
-        d_parse_stack.push_back(g_token_lexeme_map[element->token()]);
+        d_parse_stack.push_back(element->token());
 
         switch (element->token()) {
         case T_FILE_OPEN:
@@ -225,14 +220,14 @@ ParseStatus Parser::acceptValidate (QVector<std::shared_ptr<CFGElement>>& elemen
     if ((validate = next(elements)) == nullptr) {
         return PARSE_INVALID_ELEMENT;
     } else {
-        d_parse_stack.push_back(g_token_lexeme_map[validate->token()]);
+        d_parse_stack.push_back(validate->token());
     }
 
     // While we encounter elements of type: {file, directory}
     bool more = true;
     while (elements.length() > 0 && more) {
         std::shared_ptr<CFGElement> element = elements.front();
-        d_parse_stack.push_back(g_token_lexeme_map[element->token()]);
+        d_parse_stack.push_back(element->token());
 
         switch (element->token()) {
         case T_FILE_OPEN:
@@ -285,13 +280,15 @@ ParseStatus Parser::acceptOperations(QVector<std::shared_ptr<CFGElement>>& eleme
     // Pop the lead element off the stack
     if ((operations = next(elements)) == nullptr) {
         return PARSE_INVALID_ELEMENT;
+    } else {
+        d_parse_stack.push_back(operations->token());
     }
 
     // While we encounter elements of type: {copy, remove}
     bool more = true;
     while (elements.length() > 0 && more) {
         std::shared_ptr<CFGElement> element = elements.front();
-        d_parse_stack.push_back(g_token_lexeme_map[element->token()]);
+        d_parse_stack.push_back(element->token());
 
         switch (element->token()) {
         case T_COPY_OPEN:
@@ -335,7 +332,7 @@ ParseStatus Parser::acceptCopy(QVector<std::shared_ptr<CFGElement>>& elements)
     }
 
     // Require element: from
-    d_parse_stack.push_back(g_token_lexeme_map[elements.front()->token()]);
+    d_parse_stack.push_back(elements.front()->token());
     if (elements.front()->token() != T_FROM_OPEN) {
         return PARSE_INVALID_ELEMENT;
     }
@@ -361,7 +358,7 @@ ParseStatus Parser::acceptCopy(QVector<std::shared_ptr<CFGElement>>& elements)
     d_parse_stack.pop_back();
 
     // Require element: to
-    d_parse_stack.push_back(g_token_lexeme_map[elements.front()->token()]);
+    d_parse_stack.push_back(elements.front()->token());
     if (elements.front()->token() != T_TO_OPEN) {
         return PARSE_INVALID_ELEMENT;
     }
@@ -464,7 +461,8 @@ ParseStatus Parser::acceptRemove(QVector<std::shared_ptr<CFGElement>>& elements)
     }
 
     // Append remove operation
-    d_remove_operations.push_back({root_type, remove->value()});
+    Resource r = {.root = root_type, .path = remove->value()};
+    d_operations.push_back(SWU::Operation(r, RESOURCE_FILE));
 
     return retval;
 }
@@ -483,10 +481,10 @@ QString Parser::fault()
         description = QString("Invalid element: ");
         break;
     case PARSE_INVALID_ATTRIBUTE_KEY:
-        description = QString("Missing attribute key: ");
+        description = QString("Missing/Invalid attribute key in element: ");
         break;
     case PARSE_INVALID_ATTRIBUTE_VALUE:
-        description = QString("Invalid attribute value: ");
+        description = QString("Missing/Invalid attribute value in element: ");
         break;
     default:
         description = QString("Parse anomaly: ");
@@ -494,10 +492,54 @@ QString Parser::fault()
     }
 
     for (off_t i = d_parse_stack.length() - 1; i >= 0; --i) {
-        description += d_parse_stack[i];
+        description += g_token_lexeme_map[d_parse_stack[i]];
         if (i > 0) {
             description += " in\n\t";
         }
     }
     return description + "\n";
+}
+
+QString Parser::product()
+{
+    return d_product;
+}
+
+QString Parser::platform()
+{
+    return d_platform;
+}
+
+QVector<QString> Parser::resource_uris()
+{
+    return d_resource_uris;
+}
+
+QString Parser::backup_path()
+{
+    return d_backup_path;
+}
+
+QVector<QString> Parser::validate_file_paths()
+{
+    return d_validate_file_paths;
+}
+
+QVector<QString> Parser::validate_directory_paths()
+{
+    return d_validate_directory_paths;
+}
+
+QVector<QString> Parser::backup_file_paths()
+{
+    return d_backup_file_paths;
+}
+
+QVector<QString> Parser::backup_directory_paths()
+{
+    return d_backup_directory_paths;
+}
+
+QVector<Operation> Parser::operations() {
+    return d_operations;
 }

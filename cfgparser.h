@@ -5,22 +5,9 @@
 #include <QDir>
 #include "attributes.h"
 #include "cfgelement.h"
+#include "operation.h"
 
 namespace SWU {
-
-
-/*\
- * Configuration root options
- * - remote: Root of the resource uri
- * - target: Root of the local system
-\*/
-enum CFGRootType {
-    ROOT_TYPE_REMOTE,
-    ROOT_TYPE_TARGET,
-
-    /* Size */
-    ROOT_TYPE_ENUM_MAX
-};
 
 
 /*\
@@ -37,25 +24,6 @@ enum ParseStatus {
 };
 
 
-/*\
- * Structure describing a copy
- * cp <from_root/from_path> <to_root/to_path>
-\*/
-struct Copy {
-    CFGRootType from_root, to_root;
-    QString from_path, to_path;
-};
-
-
-/*\
- * Structure describing a remove
- * rm <root/path>
-\*/
-struct Remove {
-    CFGRootType root;
-    QString path;
-};
-
 class Parser
 {
 private:
@@ -64,7 +32,7 @@ private:
     ParseStatus d_status;
 
     // Parse error stack
-    QVector<QString> d_parse_stack;
+    QVector<SWU::Token> d_parse_stack;
 
     // Product and platform
     QString d_product, d_platform;
@@ -81,11 +49,8 @@ private:
     // Paths (implicitly on target) of files and directories to backup
     QVector<QString> d_backup_file_paths, d_backup_directory_paths;
 
-    // Copy operations (ordered)
-    QVector<Copy> d_copy_operations;
-
-    // Remove operations (ordered)
-    QVector<Remove> d_remove_operations;
+    // Operations
+    QVector<Operation> d_operations;
 
 
     bool hasAttributeKeys (std::shared_ptr<CFGElement> element,
@@ -188,6 +153,53 @@ public:
      * Returns nullptr if status is OK; else description of error
     \*/
     QString fault();
+
+
+    /*\
+     * Returns product desciptor string
+    \*/
+    QString product();
+
+    /*\
+     * Returns system platform; should be in format QSysInfo::kernelType()
+    \*/
+    QString platform();
+
+    /*\
+     * Returns list of resource URIs
+    \*/
+    QVector<QString> resource_uris();
+
+    /*\
+     * Returns path to backup directory
+    \*/
+    QString backup_path();
+
+    /*\
+     * Returns ordered list of file paths to validate
+    \*/
+    QVector<QString> validate_file_paths();
+
+    /*\
+     * Returns ordered list of directory paths to validate
+    \*/
+    QVector<QString> validate_directory_paths();
+
+    /*\
+     * Returns ordered list of files to backup
+    \*/
+    QVector<QString> backup_file_paths();
+
+    /*\
+     * Returns ordered list of directories to backup
+    \*/
+    QVector<QString> backup_directory_paths();
+
+    /*\
+     * Returns ordered list of operations
+    \*/
+    QVector<Operation> operations();
+
 };
 
 }

@@ -13,6 +13,7 @@ SOURCES += \
     cfgelement.cpp \
     cfgparser.cpp \
     cfgstatemachine.cpp \
+    cfgupdater.cpp \
     cfgxmlhandler.cpp \
     element.cpp \
     main.cpp \
@@ -25,6 +26,7 @@ HEADERS += \
     cfgelement.h \
     cfgparser.h \
     cfgstatemachine.h \
+    cfgupdater.h \
     cfgxmlhandler.h \
     element.h \
     mainwindow.h \
