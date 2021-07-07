@@ -14,6 +14,7 @@ namespace SWU {
 enum UpdateStatus {
     STATUS_OK,
     STATUS_BAD_PLATFORM,
+    STATUS_RESOURCE_NOT_FOUND,
     STATUS_BAD_RESULT,
     STATUS_BAD_PRECONDITION,
     STATUS_BAD_UNDO,
@@ -45,9 +46,10 @@ public:
 
     virtual UpdateStatus on_pre_update (std::shared_ptr<FSOperation> op) = 0;
 
-    virtual UpdateStatus on_exit (UpdateStatus status,
-                                   std::shared_ptr<FSOperation> op = nullptr,
-                                   OperationResult op_result = RESULT_ENUM_MAX) = 0;
+    virtual UpdateStatus on_exit (SWU::Updater &updater,
+                                  UpdateStatus status,
+                                  std::shared_ptr<FSOperation> op = nullptr,
+                                  OperationResult op_result = RESULT_ENUM_MAX) = 0;
 };
 
 class Updater
@@ -90,6 +92,9 @@ public:
     const QVector<std::shared_ptr<SWU::FSOperation>> validate_operations ();
     const QVector<std::shared_ptr<SWU::FSOperation>> backup_operations ();
     const QVector<std::shared_ptr<SWU::FSOperation>> update_operations ();
+    off_t operationCount();
+    QString product();
+    QString platform();
 };
 
 }

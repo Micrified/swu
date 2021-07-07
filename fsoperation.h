@@ -49,9 +49,9 @@ public:
 /* Remove operation */
 class RemoveOperation : public FSOperation {
 private:
-    Resource d_resource;
+    std::shared_ptr<Resource> d_resource;
 public:
-    RemoveOperation(Resource resource);
+    RemoveOperation(std::shared_ptr<Resource> resource);
     OperationResult execute () override;
     OperationResult undo () override;
     OperationResult invert () override;

@@ -33,7 +33,8 @@ UpdateStatus UpdateDelegate::on_pre_update (std::shared_ptr<FSOperation> op)
     Q_UNUSED(op);
     return STATUS_OK;
 }
-UpdateStatus UpdateDelegate::on_exit (UpdateStatus status,
+UpdateStatus UpdateDelegate::on_exit (SWU::Updater &updater,
+                                      UpdateStatus status,
                                       std::shared_ptr<FSOperation> op,
                                       OperationResult op_result)
 {
@@ -78,12 +79,12 @@ UpdateStatus Updater::execute()
 
     // Check: Platform
     if (QSysInfo::kernelType().compare(d_platform) != 0) {
-        return d_update_delegate.on_exit(STATUS_BAD_PLATFORM);
+        return d_update_delegate.on_exit(*this, STATUS_BAD_PLATFORM);
     }
 
     // Notify: Init
     if (STATUS_OK != (retval = d_update_delegate.on_init(*this))) {
-        return d_update_delegate.on_exit(retval);
+        return d_update_delegate.on_exit(*this, retval);
     }
 
     // Notify: Resource manager config
@@ -91,7 +92,7 @@ UpdateStatus Updater::execute()
                           ResourceManager::get_instance(),
                           d_resource_uris)))
     {
-        return d_update_delegate.on_exit(retval);
+        return d_update_delegate.on_exit(*this, retval);
     }
 
     // Run through operations block
@@ -101,12 +102,12 @@ UpdateStatus Updater::execute()
 
         // Precondition
         if ((retval = d.on_pre_validate(e)) != STATUS_OK) {
-            return d_update_delegate.on_exit(STATUS_BAD_PRECONDITION, e);
+            return d_update_delegate.on_exit(*this, STATUS_BAD_PRECONDITION, e);
         }
 
         // Execute
         if ((err = e.get()->execute()) != RESULT_OK) {
-            return d_update_delegate.on_exit(STATUS_BAD_RESULT, e, err);
+            return d_update_delegate.on_exit(*this, STATUS_BAD_RESULT, e, err);
         }
 
         // Increment offeset
@@ -120,12 +121,12 @@ UpdateStatus Updater::execute()
 
         // Precondition
         if ((retval = d.on_pre_backup(c)) != STATUS_OK) {
-            return d_update_delegate.on_exit(STATUS_BAD_PRECONDITION, c);
+            return d_update_delegate.on_exit(*this, STATUS_BAD_PRECONDITION, c);
         }
 
         // Execute
         if ((err = c.get()->execute()) != RESULT_OK) {
-            return d_update_delegate.on_exit(STATUS_BAD_RESULT, c, err);
+            return d_update_delegate.on_exit(*this, STATUS_BAD_RESULT, c, err);
         }
 
         // Increment pointer
@@ -134,16 +135,16 @@ UpdateStatus Updater::execute()
 
     // Run through update block (could be a remove, or copy operation)
     while (d_update_sp < d_update_operations.length()) {
-        std::shared_ptr<FSOperation> op =d_backup_operations.at(d_update_sp);
+        std::shared_ptr<FSOperation> op = d_update_operations.at(d_update_sp);
 
         // Precondition
         if ((retval = d.on_pre_update(op)) != STATUS_OK) {
-            return d_update_delegate.on_exit(STATUS_BAD_PRECONDITION, op);
+            return d_update_delegate.on_exit(*this, STATUS_BAD_PRECONDITION, op);
         }
 
         // Execute
         if ((err = op.get()->execute()) != RESULT_OK) {
-            return d_update_delegate.on_exit(STATUS_BAD_RESULT, op, err);
+            return d_update_delegate.on_exit(*this, STATUS_BAD_RESULT, op, err);
         }
 
         // Increment pointer
@@ -151,7 +152,7 @@ UpdateStatus Updater::execute()
     }
 
     // Run exit condition
-    return d_update_delegate.on_exit(retval);
+    return d_update_delegate.on_exit(*this, retval);
 }
 
 UpdateStatus Updater::undo ()
@@ -164,17 +165,17 @@ UpdateStatus Updater::undo ()
 
 
     // We want to undo update operations
-    for (off_t i = d_update_sp; i >= 0; --i) {
-        std::shared_ptr<FSOperation> op = d_update_operations.at(i);
-        if (op->undo() != RESULT_OK) {
-            return STATUS_BAD_UNDO;
-        }
-    }
+//    for (off_t i = d_update_sp - 1; i >= 0; --i) {
+//        std::shared_ptr<FSOperation> op = d_update_operations.at(i);
+//        if (op->undo() != RESULT_OK) {
+//            return STATUS_BAD_UNDO;
+//        }
+//    }
 
     // We want to invert copy operations
-    for (off_t i = d_backup_sp; i >= 0; --i) {
-        std::shared_ptr<FSOperation> op = d_update_operations.at(i);
-        if (op->undo() != RESULT_OK) {
+    for (off_t i = d_backup_sp - 1; i >= 0; --i) {
+        std::shared_ptr<FSOperation> op = d_backup_operations.at(i);
+        if (op->invert() != RESULT_OK) {
             return STATUS_BAD_UNDO;
         }
     }
@@ -210,4 +211,20 @@ const QVector<std::shared_ptr<SWU::FSOperation>> Updater::backup_operations ()
 const QVector<std::shared_ptr<SWU::FSOperation>> Updater::update_operations ()
 {
     return d_update_operations;
+}
+
+off_t Updater::operationCount()
+{
+    float sum = d_validate_operations.length() + d_backup_operations.length() + d_update_operations.length();
+    return sum;
+}
+
+QString Updater::product()
+{
+    return d_product;
+}
+
+QString Updater::platform()
+{
+    return d_platform;
 }

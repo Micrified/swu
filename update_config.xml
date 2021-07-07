@@ -1,34 +1,32 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <configuration product="Tradinco HMI" platform="linux">
-    <resource-uri>/media/usb*/update*.tgz</resource-uri>
+    <resource-uri>/run/media/sda</resource-uri>
+    <resource-uri>/media/hedon/FLASHDRIVE</resource-uri>
 
     <validate>
         <file>frontend</file>
         <file>backend</file>
-        <directory>languages/frontend</directory>
-        <directory>languages/backend</directory>
+        <file>updater</file>
     </validate>
 
     <backup path="/tmp/backup">
         <file>/opt/tradinco-hmi/frontend</file>
         <file>/opt/tradinco-hmi/backend</file>
-        <directory>/var/appdata/languages/frontend</directory>
-        <directory>/var/appdata/languages/backend</directory>
+        <file>/opt/tradinco-hmi/updater</file>
     </backup>
 
     <operations>
         <copy>
             <from root="Remote">backend</from>
-            <to root="Target">/etc</to>
+            <to root="Target">/opt/tradinco-hmi</to>
         </copy>
         <copy>
-            <from root="Remote">languages/backend/*</from>
-            <to root="Target">/etc/backend/languages</to>
+            <from root="Remote">frontend</from>
+            <to root="Target">/opt/tradinco-hmi</to>
         </copy>
         <copy>
-            <from root="Remote">languages/frontend/*</from>
-            <to root="Target">/etc/frontend/languages</to>
+            <from root="Remote">updater</from>
+            <to root="Target">/opt/tradinco-hmi</to>
         </copy>
-        <remove root="Target">/appdata/appcopy/swupdate/*</remove>
     </operations>
 </configuration>

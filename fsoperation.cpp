@@ -34,7 +34,7 @@ OperationResult FSOperation::invert() { return RESULT_OK; }
 QString FSOperation::errstr() { return nullptr; }
 QString FSOperation::label() { return nullptr; }
 
-RemoveOperation::RemoveOperation(Resource resource):
+RemoveOperation::RemoveOperation(std::shared_ptr<Resource> resource):
     d_resource(resource)
 {}
 
@@ -42,28 +42,28 @@ OperationResult RemoveOperation::execute()
 {
     OperationResult retval = RESULT_OK;
     ResourceManager resourceManager = ResourceManager::get_instance();
-    Resource r = d_resource;
+    std::shared_ptr<Resource> r = d_resource;
 
     // Build full resource path
-    QString root = resourceManager.getResourcePath(r.rootKey());
-    QString path = QDir(root).filePath(r.path());
+    QString root = resourceManager.getResourcePath(r.get()->rootKey());
+    QString path = QDir(root).filePath(r.get()->path());
 
-    qDebug() << QString("REMOVE %2 [from = \"%1\"]\n").arg(path, (r.resourceType() == RESOURCE_TYPE_FILE ? "File" : "Dir"));
+    qInfo() << "rm" << (r.get()->resourceType() == RESOURCE_TYPE_FILE ? "" : " -rf ") << path << Qt::endl;
 
     // TODO: Copy to staging location
 
     // TODO: Remove from specified location
 
-//    switch (r.resourceType()) {
-//    case RESOURCE_TYPE_FILE:
-//        retval = remove_file(path);
-//        break;
-//    case RESOURCE_TYPE_DIRECTORY:
-//        retval = remove_directory(path);
-//        break;
-//    default:
-//        retval = RESULT_BAD_RESOURCE;
-//    }
+    switch (r->resourceType()) {
+    case RESOURCE_TYPE_FILE:
+        retval = remove_file(path);
+        break;
+    case RESOURCE_TYPE_DIRECTORY:
+        retval = remove_directory(path);
+        break;
+    default:
+        retval = RESULT_BAD_RESOURCE;
+    }
 
     return retval;
 }
@@ -72,14 +72,13 @@ OperationResult RemoveOperation::undo ()
 {
     OperationResult retval = RESULT_OK;
     ResourceManager resourceManager = ResourceManager::get_instance();
-    Resource r = d_resource;
+    std::shared_ptr<Resource> r = d_resource;
 
     // Build full resource path
-    QString root = resourceManager.getResourcePath(r.rootKey());
-    QString path = QDir(root).filePath(r.path());
+    QString root = resourceManager.getResourcePath(r.get()->rootKey());
+    QString path = QDir(root).filePath(r.get()->path());
 
-    qDebug() << QString("REMOVE UNDO %2 [from = \"%1\"]\n").arg(path, (r.resourceType() == RESOURCE_TYPE_FILE ? "File" : "Dir"));
-
+    qInfo() << "undo rm" << (r.get()->resourceType() == RESOURCE_TYPE_FILE ? "" : " -rf ") << path << Qt::endl;
     // TODO: Copy from staging location back to original
 
     return retval;
@@ -98,7 +97,8 @@ QString RemoveOperation::errstr()
 
 QString RemoveOperation::label()
 {
-    return QString("Remove %1").arg(d_resource.path());
+    QString path = d_resource.get()->path();
+    return path;
 }
 
 CopyOperation::CopyOperation(Resource from, Resource to):
@@ -118,19 +118,19 @@ OperationResult CopyOperation::execute()
     QString from_path = QDir(from_root).filePath(from.path());
     QString to_path = QDir(to_root).filePath(to.path());
 
-    qDebug() << QString("COPY %3 [from = \"%1\", to = \"%2\"]\n").arg(from_path, to_path,
-                 (from.resourceType() == RESOURCE_TYPE_FILE ? "File" : "Dir"));
+    qInfo() << "from: " << from.path() << ", to: " << to.path();
+    qInfo() << "cp" << (from.resourceType() == RESOURCE_TYPE_FILE ? "" : "-r") << from_path << to_path << Qt::endl;
 
-//    switch (from.resourceType()) {
-//    case RESOURCE_TYPE_FILE:
-//        retval = copy_file(from_path, to_path, true);
-//        break;
-//    case RESOURCE_TYPE_DIRECTORY:
-//        retval = copy_directory(from_path, to_path, true);
-//        break;
-//    default:
-//        retval = RESULT_BAD_RESOURCE;
-//    }
+    switch (from.resourceType()) {
+    case RESOURCE_TYPE_FILE:
+        retval = copy_file(from_path, to_path, true);
+        break;
+    case RESOURCE_TYPE_DIRECTORY:
+        retval = copy_directory(from_path, to_path, true);
+        break;
+    default:
+        retval = RESULT_BAD_RESOURCE;
+    }
 
     return retval;
 }
@@ -145,8 +145,7 @@ OperationResult CopyOperation::undo()
     QString to_remove_root = resourceManager.getResourcePath(to_remove.rootKey());
     QString to_remove_path = QDir(to_remove_root).filePath(to_remove.path());
 
-    qDebug() << QString("UNDO COPY %2 [remove = \"%1\"]\n").arg(to_remove_path,
-                 (to_remove.resourceType() == RESOURCE_TYPE_FILE ? "File" : "Dir"));
+    qInfo() << "rm" << (to_remove.resourceType() == RESOURCE_TYPE_FILE ? "" : "-r") << to_remove_path << Qt::endl;
 
     // TODO: Implement undo
 
@@ -165,19 +164,29 @@ OperationResult CopyOperation::invert()
     QString from_path = QDir(from_root).filePath(from.path());
     QString to_path = QDir(to_root).filePath(to.path());
 
-    qDebug() << QString("INVERT COPY %3 [from = \"%1\", to = \"%2\"]\n").arg(from_path, to_path,
-                 (from.resourceType() == RESOURCE_TYPE_FILE ? "File" : "Dir"));
+    // Get the filename (last element) on the "from" resource path
+    QFileInfo from_fileInfo(d_from_resource.path());
+    QString from_filename = from_fileInfo.fileName();
 
-//    switch (from.resourceType()) {
-//    case RESOURCE_TYPE_FILE:
-//        retval = copy_file(from_path, to_path, true);
-//        break;
-//    case RESOURCE_TYPE_DIRECTORY:
-//        retval = copy_directory(from_path, to_path, true);
-//        break;
-//    default:
-//        retval = RESULT_BAD_RESOURCE;
-//    }
+    // Append the filename to the new "from" (formerly to) resource path
+    from_path += QString("%1").arg(from_filename);
+
+    // Remove the filename from the "to" (formerly from) resource path
+    off_t cut_index = to_path.lastIndexOf('/');
+    to_path = to_path.left(cut_index);
+
+    qDebug() << "cp" << (to.resourceType() == RESOURCE_TYPE_FILE ? "" : "-r") << from_path << to_path << Qt::endl;
+
+    switch (from.resourceType()) {
+    case RESOURCE_TYPE_FILE:
+        retval = copy_file(from_path, to_path, true);
+        break;
+    case RESOURCE_TYPE_DIRECTORY:
+        retval = copy_directory(from_path, to_path, true);
+        break;
+    default:
+        retval = RESULT_BAD_RESOURCE;
+    }
 
     return retval;
 }
@@ -190,7 +199,7 @@ QString CopyOperation::errstr()
 
 QString CopyOperation::label()
 {
-    return QString("Copy %1 to %2").arg(d_from_resource.path(), d_to_resource.path());
+    return d_from_resource.path() + " to " + d_to_resource.path();
 }
 
 ExpectOperation::ExpectOperation(Resource resource):
@@ -207,7 +216,7 @@ OperationResult ExpectOperation::execute()
     QString root = resourceManager.getResourcePath(from.rootKey());
     QString path = QDir(root).filePath(from.path());
 
-    qDebug() << QString("VALIDATE %2 [from = \"%1\"]\n").arg(path, (from.resourceType() == RESOURCE_TYPE_FILE ? "File" : "Dir"));
+    qInfo() << "stat" << path << Qt::endl;
 
     // TODO: Unimplemented
 
@@ -232,7 +241,7 @@ QString ExpectOperation::errstr()
 
 QString ExpectOperation::label()
 {
-    return QString("Validate %1").arg(d_resource.path());
+    return d_resource.path();
 }
 
 /*

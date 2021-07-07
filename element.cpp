@@ -61,10 +61,10 @@ bool Element::ready ()
 
 QString Element::description ()
 {
-    QString s = g_token_lexeme_map[d_token];
+    QString att, t = g_token_lexeme_map[d_token];
     QMap<QString,QString>::iterator iter;
     for (iter = d_attributes.begin(); iter != d_attributes.end(); ++iter) {
-        s += " [" + iter.key() + ":" + iter.value() + "]";
+        att += " [" + iter.key() + ":" + iter.value() + "]";
     }
-    return s;
+    return t + att + " { " + d_value + " } " + t;
 }

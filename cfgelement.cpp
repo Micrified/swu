@@ -7,6 +7,9 @@ CFGElement::CFGElement(std::shared_ptr<Element> &element):
 {
     Attributes a = Attributes::get_instance();
 
+    // Set the value
+    d_value = QString(element->value());
+
     // Initialize the attribute index
 #pragma unroll(ATTRIBUTE_KEY_ENUM_MAX)
     for (off_t i = 0; i < ATTRIBUTE_KEY_ENUM_MAX; ++i) {

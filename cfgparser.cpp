@@ -4,6 +4,10 @@ using namespace SWU;
 // Array-designation map: Token to lexeme
 extern QString g_token_lexeme_map[];
 
+// Forward declarations
+static QString dropRootPrefix (const QString s);
+static QString dropNameAndRootPrefix (const QString s);
+
 std::shared_ptr<CFGElement> next(QVector<std::shared_ptr<CFGElement>> &elements)
 {
     std::shared_ptr<CFGElement> e = nullptr;
@@ -184,16 +188,18 @@ ParseStatus Parser::acceptBackup (QVector<std::shared_ptr<CFGElement>>& elements
         switch (element->token()) {
         case T_FILE_OPEN:
             retval = acceptFile(elements, &temp_path_value);
+            qInfo() << "backup to: " << QDir(d_backup_path).filePath(dropNameAndRootPrefix(temp_path_value));
             d_backup_operations.push_back(std::make_shared<CopyOperation>(CopyOperation(
               Resource(QString(temp_path_value), RESOURCE_TYPE_FILE),
-              Resource(QDir(d_backup_path).filePath(temp_path_value),RESOURCE_TYPE_FILE))
+              Resource(QDir(d_backup_path).filePath(dropNameAndRootPrefix(temp_path_value)),RESOURCE_TYPE_FILE))
             ));
             break;
         case T_DIRECTORY_OPEN:
             retval = acceptDirectory(elements, &temp_path_value);
+            qInfo() << "backup to: " << QDir(d_backup_path).filePath(dropNameAndRootPrefix(temp_path_value));
             d_backup_operations.push_back(std::make_shared<CopyOperation>(CopyOperation(
               Resource(QString(temp_path_value), RESOURCE_TYPE_DIRECTORY),
-              Resource(QDir(d_backup_path).filePath(temp_path_value), RESOURCE_TYPE_DIRECTORY))
+              Resource(QDir(d_backup_path).filePath(dropNameAndRootPrefix(temp_path_value)), RESOURCE_TYPE_DIRECTORY))
             ));
             break;
         default:
@@ -477,11 +483,19 @@ ParseStatus Parser::acceptRemove(QVector<std::shared_ptr<CFGElement>>& elements)
         return PARSE_INVALID_ATTRIBUTE_VALUE;
     }
 
+    // Create a new resource
+    std::shared_ptr<Resource> resource = std::make_shared<Resource>(
+        QString(remove->value()),
+        RESOURCE_TYPE_FILE,
+        root_type
+    );
+
+    qDebug() << "acceptRemove(): " << remove.get()->description();
+    qDebug() << "acceptRemove(): " << remove->value() << Qt::endl;
+
     // Append remove operation
     d_update_operations.push_back(
-        std::make_shared<RemoveOperation>(RemoveOperation(
-            Resource(remove->value(), RESOURCE_TYPE_FILE, root_type)
-        ))
+        std::make_shared<RemoveOperation>(RemoveOperation(resource))
     );
 
     return retval;
@@ -555,3 +569,33 @@ QVector<std::shared_ptr<SWU::FSOperation>> Parser::update_operations()
     return d_update_operations;
 }
 
+static QString dropRootPrefix (const QString s)
+{
+    QString clone = QString(s);
+    if (clone.at(0) == '/') {
+        clone.remove(0,1);
+    }
+    return clone;
+}
+
+static QString dropNameAndRootPrefix (const QString s) {
+    QString path = dropRootPrefix(s);
+
+    // drop the last element
+    QStringList list = path.split("/");
+
+    // Case: One element, then just return
+    if (list.length() == 1) {
+        return list.value(0);
+    }
+
+    // Otherwise concat
+    QString concat = "";
+    for (off_t i = 0; i < list.length() - 1; ++i) {
+        concat += list.at(i);
+        if (i < (list.length() - 1)) {
+            concat += "/";
+        }
+    }
+    return concat;
+}

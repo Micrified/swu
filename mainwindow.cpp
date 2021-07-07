@@ -8,24 +8,17 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    // Configure state-machine
-    QStateMachine *machine = new QStateMachine();
-    QState *start = new QState();
-    QState *final = new QState();
 
-    machine->addState(start);
-    machine->addState(final);
+}
 
-    start->addTransition(this, SIGNAL(on_pushButton_clicked), final);
-
-    machine->setInitialState(start);
-    machine->start();
+Ui::MainWindow *MainWindow::getUI()
+{
+    return ui;
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
-    delete d_machine;
 }
 
 

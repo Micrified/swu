@@ -32,19 +32,19 @@ bool ConfigXMLHandler::endDocument()
     }
 
     // [TODO: Remove] Print stack
-    for (off_t i = 0; i < d_element_stack.size(); ++i) {
-        QString prefix = "";
-        std::shared_ptr<Element> element_p = d_element_stack.at(i);
-        if (!element_p->parent().expired()) {
-            std::weak_ptr<Element> parent = element_p->parent();
-            if (auto p = parent.lock()) {
-                QString parent_lexeme = g_token_lexeme_map[p->token()];
-                prefix.append(parent_lexeme + "::");
-            }
-        }
-        qCritical() << prefix << "[" << g_token_lexeme_map[element_p->token()] << "]: value="
-                << element_p->value() << ", ready=" << element_p->ready();
-    }
+//    for (off_t i = 0; i < d_element_stack.size(); ++i) {
+//        QString prefix = "";
+//        std::shared_ptr<Element> element_p = d_element_stack.at(i);
+//        if (!element_p->parent().expired()) {
+//            std::weak_ptr<Element> parent = element_p->parent();
+//            if (auto p = parent.lock()) {
+//                QString parent_lexeme = g_token_lexeme_map[p->token()];
+//                prefix.append(parent_lexeme + "::");
+//            }
+//        }
+//        qCritical() << prefix << "[" << g_token_lexeme_map[element_p->token()] << "]: value="
+//                << element_p->value() << ", ready=" << element_p->ready();
+//    }
     qInfo() << "Ok";
 
     // Mark parsed
