@@ -491,7 +491,7 @@ ParseStatus Parser::acceptRemove(QVector<std::shared_ptr<CFGElement>>& elements)
     );
 
     qDebug() << "acceptRemove(): " << remove.get()->description();
-    qDebug() << "acceptRemove(): " << remove->value() << Qt::endl;
+    qDebug() << "acceptRemove(): " << remove->value() ;
 
     // Append remove operation
     d_update_operations.push_back(

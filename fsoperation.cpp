@@ -48,7 +48,7 @@ OperationResult RemoveOperation::execute()
     QString root = resourceManager.getResourcePath(r.get()->rootKey());
     QString path = QDir(root).filePath(r.get()->path());
 
-    qInfo() << "rm" << (r.get()->resourceType() == RESOURCE_TYPE_FILE ? "" : " -rf ") << path << Qt::endl;
+    qInfo() << "rm" << (r.get()->resourceType() == RESOURCE_TYPE_FILE ? "" : " -rf ") << path ;
 
     // TODO: Copy to staging location
 
@@ -78,7 +78,7 @@ OperationResult RemoveOperation::undo ()
     QString root = resourceManager.getResourcePath(r.get()->rootKey());
     QString path = QDir(root).filePath(r.get()->path());
 
-    qInfo() << "undo rm" << (r.get()->resourceType() == RESOURCE_TYPE_FILE ? "" : " -rf ") << path << Qt::endl;
+    qInfo() << "undo rm" << (r.get()->resourceType() == RESOURCE_TYPE_FILE ? "" : " -rf ") << path ;
     // TODO: Copy from staging location back to original
 
     return retval;
@@ -119,7 +119,7 @@ OperationResult CopyOperation::execute()
     QString to_path = QDir(to_root).filePath(to.path());
 
     qInfo() << "from: " << from.path() << ", to: " << to.path();
-    qInfo() << "cp" << (from.resourceType() == RESOURCE_TYPE_FILE ? "" : "-r") << from_path << to_path << Qt::endl;
+    qInfo() << "cp" << (from.resourceType() == RESOURCE_TYPE_FILE ? "" : "-r") << from_path << to_path ;
 
     switch (from.resourceType()) {
     case RESOURCE_TYPE_FILE:
@@ -145,7 +145,7 @@ OperationResult CopyOperation::undo()
     QString to_remove_root = resourceManager.getResourcePath(to_remove.rootKey());
     QString to_remove_path = QDir(to_remove_root).filePath(to_remove.path());
 
-    qInfo() << "rm" << (to_remove.resourceType() == RESOURCE_TYPE_FILE ? "" : "-r") << to_remove_path << Qt::endl;
+    qInfo() << "rm" << (to_remove.resourceType() == RESOURCE_TYPE_FILE ? "" : "-r") << to_remove_path ;
 
     // TODO: Implement undo
 
@@ -175,7 +175,7 @@ OperationResult CopyOperation::invert()
     off_t cut_index = to_path.lastIndexOf('/');
     to_path = to_path.left(cut_index);
 
-    qDebug() << "cp" << (to.resourceType() == RESOURCE_TYPE_FILE ? "" : "-r") << from_path << to_path << Qt::endl;
+    qDebug() << "cp" << (to.resourceType() == RESOURCE_TYPE_FILE ? "" : "-r") << from_path << to_path;
 
     switch (from.resourceType()) {
     case RESOURCE_TYPE_FILE:
@@ -216,7 +216,7 @@ OperationResult ExpectOperation::execute()
     QString root = resourceManager.getResourcePath(from.rootKey());
     QString path = QDir(root).filePath(from.path());
 
-    qInfo() << "stat" << path << Qt::endl;
+    qInfo() << "stat" << path ;
 
     // TODO: Unimplemented
 
@@ -258,41 +258,41 @@ static OperationResult copy_file (const QString filename,
     OperationResult result = RESULT_OK;
 
     qDebug() << "copy_file(" << filename << ","
-             << directory << ") [force = " << force << "]" << Qt::endl;
+             << directory << ") [force = " << force << "]" ;
 
     // Check if source file exists
     const QFileInfo source(filename);
     if (false == source.exists()) {
-        qDebug() << " --- Source file does not exist!" << Qt::endl;
+        qDebug() << " --- Source file does not exist!" ;
         return RESULT_BAD_RESOURCE;
     }
 
     // Check if the destination directory exists
     const QDir destination(directory);
     if (false == destination.exists() && false == force) {
-        qDebug() << " --- Destination directory does not exist!" << Qt::endl;
+        qDebug() << " --- Destination directory does not exist!" ;
         return RESULT_BAD_DESTINATION;
     }
 
     // Create the directory if needed
     if (false == destination.exists() && false == destination.mkpath(directory)) {
-        qDebug() << " --- Unable to create destination directory" << Qt::endl;
+        qDebug() << " --- Unable to create destination directory" ;
         return RESULT_BAD_DESTINATION;
     }
 
     // Remove any existing file (if force is specified)
     QFileInfo copy = destination.absoluteFilePath(source.fileName());
-    qDebug() << "[!] Checking if a copy exists already at: " << copy.filePath() << Qt::endl;
+    qDebug() << "[!] Checking if a copy exists already at: " << copy.filePath() ;
     if (copy.exists() && false == force) {
         return RESULT_BAD_DESTINATION;
     } else {
-        qDebug() << " --- Removed already existing file at: " << copy.filePath() << Qt::endl;
+        qDebug() << " --- Removed already existing file at: " << copy.filePath() ;
         remove_file(copy.absoluteFilePath());
     }
 
     // Copy the file
     if (false == QFile::copy(filename, QDir(directory).filePath(source.fileName()))) {
-        qDebug() << " --- Bad result on QFile::copy(" << filename << "," << directory << ")" << Qt::endl;
+        qDebug() << " --- Bad result on QFile::copy(" << filename << "," << directory << ")" ;
         return RESULT_BAD_DESTINATION;
     }
 
@@ -301,47 +301,47 @@ static OperationResult copy_file (const QString filename,
 
 static OperationResult copy_directory (const QString dirname, const QString directory, bool force)
 {
-    qDebug() << "copy_directory(" << dirname << "," << directory << ") [force = " << force << "]" << Qt::endl;
+    qDebug() << "copy_directory(" << dirname << "," << directory << ") [force = " << force << "]" ;
 
     // Check if source directory exists
     const QDir source(dirname);
     if (false == source.exists()) {
-        qDebug() << " --- Source directory does not exist!" << Qt::endl;
+        qDebug() << " --- Source directory does not exist!" ;
         return RESULT_BAD_RESOURCE;
     }
 
-    qDebug() << " A " << Qt::endl;
+    qDebug() << " A " ;
 
     // Check if the destination directory exists
     const QDir destination(directory);
     if (false == destination.exists() && false == force) {
-        qDebug() << " --- Destination directory does not exist (and no force)!" << Qt::endl;
+        qDebug() << " --- Destination directory does not exist (and no force)!" ;
         return RESULT_BAD_DESTINATION;
     }
 
-    qDebug() << " B " << Qt::endl;
+    qDebug() << " B " ;
 
     // Create destination directory name
-    qDebug() << "Source.dirname() = " << source.dirName() << Qt::endl;
+    qDebug() << "Source.dirname() = " << source.dirName() ;
     QDir new_destination(destination.absoluteFilePath(source.dirName()));
 
     // Create directory if necessary
     if (false == new_destination.exists() && false == new_destination.mkpath(new_destination.path())) {
-        qDebug() << " --- Unable to create destination directory at: " << new_destination.path() << Qt::endl;
+        qDebug() << " --- Unable to create destination directory at: " << new_destination.path() ;
         return RESULT_BAD_DESTINATION;
     } else {
-        qDebug() << " --- Created: " << new_destination.path() << Qt::endl;
+        qDebug() << " --- Created: " << new_destination.path() ;
     }
 
-    qDebug() << " C " << Qt::endl;
+    qDebug() << " C " ;
 
     // Copy the directory (recursive - perhaps unwise with limited stack)
     const QFlags<QDir::Filter> flags = QDir::Filter::Dirs | QDir::Filter::Files | QDir::Filter::NoSymLinks |
                                        QDir::Filter::NoDotAndDotDot | QDir::Filter::Hidden;
     QFileInfoList contents = source.entryInfoList(flags, QDir::DirsFirst);
-    qDebug() << "There are " << contents.size() << " elements inside directory " << source.dirName() << Qt::endl;
+    qDebug() << "There are " << contents.size() << " elements inside directory " << source.dirName() ;
     for (off_t i = 0; i < contents.size(); ++i) {
-        qDebug() << "Item " << i << Qt::endl;
+        qDebug() << "Item " << i ;
         QFileInfo item = contents.at(i);
         OperationResult result;
         if (item.isDir()) {
@@ -354,7 +354,7 @@ static OperationResult copy_directory (const QString dirname, const QString dire
         }
     }
 
-    qDebug() << " D " << Qt::endl;
+    qDebug() << " D " ;
 
     return RESULT_OK;
 }

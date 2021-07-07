@@ -27,13 +27,13 @@ std::shared_ptr<SWU::Updater> getUpdater (const char *config_filename, SWU::Upda
 
     // Open file
     if (nullptr == (file_handle = fopen(config_filename, "r"))) {
-        qCritical() << "FILE: Cannot open: " << QString(config_filename) << ": " << QString(strerror(errno)) << Qt::endl;
+        qCritical() << "FILE: Cannot open: " << QString(config_filename) << ": " << QString(strerror(errno)) ;
         return nullptr;
     }
 
     // Convert to QFile
     if (false == file.open(file_handle, QIODevice::ReadOnly)) {
-        qCritical() << "QFile: Cannot open: " << QString(config_filename) << Qt::endl;
+        qCritical() << "QFile: Cannot open: " << QString(config_filename) ;
         return nullptr;
     }
 
@@ -48,7 +48,7 @@ std::shared_ptr<SWU::Updater> getUpdater (const char *config_filename, SWU::Upda
 
     // Check handler output
     if (false == handler.parsed()) {
-        qCritical() << "XML Parse: Failed" << Qt::endl;
+        qCritical() << "XML Parse: Failed" ;
         return nullptr;
     }
 
@@ -64,7 +64,7 @@ std::shared_ptr<SWU::Updater> getUpdater (const char *config_filename, SWU::Upda
     // Parse the SWU elements now
     SWU::Parser parser(config_elements);
     if (SWU::PARSE_OK != parser.status()) {
-        qCritical() << "SWU Parse: Failed for reason: " << QString(parser.fault()) << Qt::endl;
+        qCritical() << "SWU Parse: Failed for reason: " << QString(parser.fault()) ;
         return nullptr;
     }
 
@@ -112,7 +112,7 @@ public:
 
     SWU::UpdateStatus on_init (SWU::Updater &updater)
     {
-        qInfo() << "on_init()" << Qt::endl;
+        qInfo() << "on_init()" ;
 
         // Set the product label
         d_window->getUI()->productLabel->setText(updater.product());
