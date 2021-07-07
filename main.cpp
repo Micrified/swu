@@ -76,6 +76,20 @@ std::shared_ptr<SWU::Updater> getUpdater (const char *config_filename, SWU::Upda
 }
 
 
+/* Enable: systemd service */
+static int systemd_service_stop (QString service)
+{
+    return QProcess::execute("systemctl", QStringList() << "stop" << service);
+}
+
+static bool systemd_service_start (QString service)
+{
+    return QProcess::execute("systemctl", QStringList() << "start" << service);
+}
+
+
+
+
 /* Class which implements the updater interface */
 class MyUpdateDelegate : public SWU::UpdateDelegate {
 private:
@@ -117,9 +131,14 @@ public:
         d_window->getUI()->statusLabel->setText("Stopping services");
         QThread::msleep(500);
 
-        // TODO: systemctl stop frontend.service
 
-        // TODO: systemctl stop backend.service
+        // Stop services
+        if (systemd_service_stop("backend.service")) {
+            qInfo() << "Notice: Failed to stop backend, continuing anyways";
+        }
+        if (systemd_service_stop("frontend.service")) {
+            qInfo() << "Notice: Failed to stop frontend, continuing anyways";
+        }
 
         // Set post UI
         d_window->getUI()->progressBar->setValue(advanceStep());
@@ -288,9 +307,13 @@ public:
                 break;
         }
 
-        // TODO: systemctl start backend.service
-
-        // TODO: systemctl start frontend.service
+        // start services
+        if (systemd_service_start("backend.service")) {
+            qInfo() << "Notice: Failed to start backend, continuing anyways";
+        }
+        if (systemd_service_start("frontend.service")) {
+            qInfo() << "Notice: Failed to start frontend, continuing anyways";
+        }
 
         // Set post UI
         d_window->getUI()->progressBar->setValue(advanceStep());
@@ -340,17 +363,7 @@ int main(int argc, char *argv[])
     MainWindow w;
     w.show();
 
-//    // Create my update delegate
-//    MyUpdateDelegate myDelegate = MyUpdateDelegate(&w);
-
-//    // Get the updater
-//    std::shared_ptr<SWU::Updater> updater = getUpdater(argv[1], myDelegate);
-
-//    // Execute the updater
-//    if (updater->execute() != SWU::STATUS_OK) {
-//        qCritical() << "Failed to run the update routine!";
-//    }
-
+    // Run the update routine
     WorkThread updateWorkThread(argv[1], &w);
     updateWorkThread.start();
     return a.exec();
