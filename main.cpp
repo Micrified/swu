@@ -307,12 +307,14 @@ public:
                 break;
         }
 
-        // start services
-        if (systemd_service_start("backend.service")) {
-            qInfo() << "Notice: Failed to start backend, continuing anyways";
-        }
-        if (systemd_service_start("frontend.service")) {
-            qInfo() << "Notice: Failed to start frontend, continuing anyways";
+        // start services (only if update restore didn't fail)
+        if (should_stay_onscreen == false) {
+            if (systemd_service_start("backend.service")) {
+                qInfo() << "Notice: Failed to start backend, continuing anyways";
+            }
+            if (systemd_service_start("frontend.service")) {
+                qInfo() << "Notice: Failed to start frontend, continuing anyways";
+            }
         }
 
         // Set post UI
@@ -320,7 +322,7 @@ public:
         d_window->getUI()->statusLabel->setText(last_message);
 
         if (should_stay_onscreen == false) {
-            // TODO: Kill self
+            QApplication::quit();
         }
 
         return status;
@@ -347,6 +349,9 @@ public:
     void run() override
     {
         d_updater->execute();
+
+        // Kill window
+
     }
 };
 
