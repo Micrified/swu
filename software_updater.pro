@@ -16,10 +16,12 @@ SOURCES += \
     cfgupdater.cpp \
     cfgxmlhandler.cpp \
     element.cpp \
+    fsoperation.cpp \
     main.cpp \
     mainwindow.cpp \
-    operation.cpp \
-    #update.cpp
+ \    #update.cpp
+    resource.cpp \
+    resource_manager.cpp
 
 HEADERS += \
     attributes.h \
@@ -29,9 +31,11 @@ HEADERS += \
     cfgupdater.h \
     cfgxmlhandler.h \
     element.h \
+    fsoperation.h \
     mainwindow.h \
-    operation.h \
-    #update.h
+ \    #update.h
+    resource.h \
+    resource_manager.h
 
 FORMS += \
     mainwindow.ui

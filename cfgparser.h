@@ -5,7 +5,8 @@
 #include <QDir>
 #include "attributes.h"
 #include "cfgelement.h"
-#include "operation.h"
+#include "resource.h"
+#include "fsoperation.h"
 
 namespace SWU {
 
@@ -43,15 +44,14 @@ private:
     // Path (implicitly on target) at which to backup specified files/directories
     QString d_backup_path;
 
-    // Paths of files and directories to validate
-    QVector<QString> d_validate_file_paths, d_validate_directory_paths;
+    // Validation operations for files and directories (implicitly on resource)
+    QVector<std::shared_ptr<SWU::FSOperation>> d_validate_operations;
 
-    // Paths (implicitly on target) of files and directories to backup
-    QVector<QString> d_backup_file_paths, d_backup_directory_paths;
+    // Backup operations for files and directories (implicitly on target)
+    QVector<std::shared_ptr<SWU::FSOperation>> d_backup_operations;
 
-    // Operations
-    QVector<Operation> d_operations;
-
+    // Operations (copy/remove files from/to target and resource)
+    QVector<std::shared_ptr<SWU::FSOperation>> d_update_operations;
 
     bool hasAttributeKeys (std::shared_ptr<CFGElement> element,
                            QVector<attribute_kp_pair> key_pointer_pairs);
@@ -176,29 +176,19 @@ public:
     QString backup_path();
 
     /*\
-     * Returns ordered list of file paths to validate
+     * Returns ordered vector of validation operations
     \*/
-    QVector<QString> validate_file_paths();
+    QVector<std::shared_ptr<SWU::FSOperation>> validate_operations();
 
     /*\
-     * Returns ordered list of directory paths to validate
+     * Returns ordered vector of backup operations
     \*/
-    QVector<QString> validate_directory_paths();
+    QVector<std::shared_ptr<SWU::FSOperation>> backup_operations();
 
     /*\
-     * Returns ordered list of files to backup
+     * Returns ordered vector of update operations
     \*/
-    QVector<QString> backup_file_paths();
-
-    /*\
-     * Returns ordered list of directories to backup
-    \*/
-    QVector<QString> backup_directory_paths();
-
-    /*\
-     * Returns ordered list of operations
-    \*/
-    QVector<Operation> operations();
+    QVector<std::shared_ptr<SWU::FSOperation>> update_operations();
 
 };
 

@@ -184,11 +184,17 @@ ParseStatus Parser::acceptBackup (QVector<std::shared_ptr<CFGElement>>& elements
         switch (element->token()) {
         case T_FILE_OPEN:
             retval = acceptFile(elements, &temp_path_value);
-            d_backup_file_paths.push_back(QString(temp_path_value));
+            d_backup_operations.push_back(std::make_shared<CopyOperation>(CopyOperation(
+              Resource(QString(temp_path_value), RESOURCE_TYPE_FILE),
+              Resource(QDir(d_backup_path).filePath(temp_path_value),RESOURCE_TYPE_FILE))
+            ));
             break;
         case T_DIRECTORY_OPEN:
             retval = acceptDirectory(elements, &temp_path_value);
-            d_backup_directory_paths.push_back(QString(temp_path_value));
+            d_backup_operations.push_back(std::make_shared<CopyOperation>(CopyOperation(
+              Resource(QString(temp_path_value), RESOURCE_TYPE_DIRECTORY),
+              Resource(QDir(d_backup_path).filePath(temp_path_value), RESOURCE_TYPE_DIRECTORY))
+            ));
             break;
         default:
             more = false;
@@ -232,11 +238,17 @@ ParseStatus Parser::acceptValidate (QVector<std::shared_ptr<CFGElement>>& elemen
         switch (element->token()) {
         case T_FILE_OPEN:
             retval = acceptFile(elements, &temp_path_value);
-            d_validate_file_paths.push_back(QString(temp_path_value));
+            d_validate_operations.push_back(
+                std::make_shared<ExpectOperation>(ExpectOperation(Resource(QString(temp_path_value), RESOURCE_TYPE_FILE,
+                                         RESOURCE_KEY_REMOTE)))
+            );
             break;
         case T_DIRECTORY_OPEN:
             retval = acceptDirectory(elements, &temp_path_value);
-            d_validate_directory_paths.push_back(QString(temp_path_value));
+            d_validate_operations.push_back(
+                std::make_shared<ExpectOperation>(ExpectOperation(Resource(QString(temp_path_value), RESOURCE_TYPE_DIRECTORY,
+                                         RESOURCE_KEY_REMOTE)))
+            );
             break;
         default:
             more = false;
@@ -321,7 +333,9 @@ ParseStatus Parser::acceptCopy(QVector<std::shared_ptr<CFGElement>>& elements)
 {
     ParseStatus retval = PARSE_OK;
     std::shared_ptr<CFGElement> copy;
-    CFGRootType from_root = ROOT_TYPE_ENUM_MAX, to_root = ROOT_TYPE_ENUM_MAX;
+    resource_root_key_t from_root = RESOURCE_KEY_ENUM_MAX;
+    resource_root_key_t to_root = RESOURCE_KEY_ENUM_MAX;
+
     QString from_path = nullptr, to_path = nullptr;
     QString from_root_value = nullptr, to_root_value = nullptr;
     off_t i = -1;
@@ -347,7 +361,7 @@ ParseStatus Parser::acceptCopy(QVector<std::shared_ptr<CFGElement>>& elements)
     });
 
     // CFGRootType array with index parity
-    CFGRootType valid_root_index[] = {ROOT_TYPE_REMOTE, ROOT_TYPE_TARGET};
+    resource_root_key_t valid_root_index[] = {RESOURCE_KEY_REMOTE, RESOURCE_KEY_ROOT};
 
     // Validate: from
     if ((i = attributeValueInSet(from_root_value, valid_attribute_index)) == -1) {
@@ -375,7 +389,10 @@ ParseStatus Parser::acceptCopy(QVector<std::shared_ptr<CFGElement>>& elements)
     d_parse_stack.pop_back();
 
     // Push copy operation
-    d_copy_operations.push_back({from_root, to_root, from_path, to_path});
+    d_update_operations.push_back(std::make_shared<CopyOperation>(CopyOperation(
+        Resource(from_path, RESOURCE_TYPE_FILE, from_root),
+        Resource(to_path, RESOURCE_TYPE_DIRECTORY, to_root))
+    ));
 
     return retval;
 }
@@ -436,7 +453,7 @@ ParseStatus Parser::acceptRemove(QVector<std::shared_ptr<CFGElement>>& elements)
     QString root_value_raw = nullptr;
     attribute_value_t root_value = ATTRIBUTE_VALUE_ENUM_MAX;
     Attributes a = Attributes::get_instance();
-    CFGRootType root_type = ROOT_TYPE_ENUM_MAX;
+    resource_root_key_t root_type = RESOURCE_KEY_ENUM_MAX;
 
     // Pop the lead element off the stack
     std::shared_ptr<CFGElement> remove = next(elements);
@@ -451,18 +468,21 @@ ParseStatus Parser::acceptRemove(QVector<std::shared_ptr<CFGElement>>& elements)
 
     // Validate attribute: {root}
     if ((root_value = a.value(root_value_raw)) == ATTRIBUTE_VALUE_REMOTE) {
-        root_type = ROOT_TYPE_REMOTE;
+        root_type = RESOURCE_KEY_REMOTE;
     }
     if (root_value == ATTRIBUTE_VALUE_TARGET) {
-        root_type = ROOT_TYPE_TARGET;
+        root_type = RESOURCE_KEY_ROOT;
     }
-    if (root_type == ROOT_TYPE_ENUM_MAX) {
+    if (root_type == RESOURCE_KEY_ENUM_MAX) {
         return PARSE_INVALID_ATTRIBUTE_VALUE;
     }
 
     // Append remove operation
-    Resource r = {.root = root_type, .path = remove->value()};
-    d_operations.push_back(SWU::Operation(r, RESOURCE_FILE));
+    d_update_operations.push_back(
+        std::make_shared<RemoveOperation>(RemoveOperation(
+            Resource(remove->value(), RESOURCE_TYPE_FILE, root_type)
+        ))
+    );
 
     return retval;
 }
@@ -520,26 +540,18 @@ QString Parser::backup_path()
     return d_backup_path;
 }
 
-QVector<QString> Parser::validate_file_paths()
+QVector<std::shared_ptr<SWU::FSOperation>> Parser::validate_operations()
 {
-    return d_validate_file_paths;
+    return d_validate_operations;
 }
 
-QVector<QString> Parser::validate_directory_paths()
+QVector<std::shared_ptr<SWU::FSOperation>> Parser::backup_operations()
 {
-    return d_validate_directory_paths;
+    return d_backup_operations;
 }
 
-QVector<QString> Parser::backup_file_paths()
+QVector<std::shared_ptr<SWU::FSOperation>> Parser::update_operations()
 {
-    return d_backup_file_paths;
+    return d_update_operations;
 }
 
-QVector<QString> Parser::backup_directory_paths()
-{
-    return d_backup_directory_paths;
-}
-
-QVector<Operation> Parser::operations() {
-    return d_operations;
-}

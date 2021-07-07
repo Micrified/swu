@@ -4,12 +4,14 @@
 #include "element.h"
 #include "cfgelement.h"
 #include "cfgparser.h"
-//#include "update.h"
+#include "cfgupdater.h"
+
 #include <QApplication>
 #include <QtXml>
 #include <iostream>
 
-int parseSoftwareUpdate (const char *filename)
+
+std::shared_ptr<SWU::Updater> getUpdater (const char *config_filename, SWU::UpdateDelegate &delegate)
 {
     FILE *file_handle;
     QFile file;
@@ -17,86 +19,122 @@ int parseSoftwareUpdate (const char *filename)
     QXmlSimpleReader reader;
     ConfigXMLHandler handler;
 
-    // Get file-descriptor for filename
-    if (nullptr == (file_handle = fopen(filename, "r"))) {
-        qCritical() << "Cannot find file " << QString(filename) << Qt::endl;
-        return -1;
+    // Open file
+    if (nullptr == (file_handle = fopen(config_filename, "r"))) {
+        qCritical() << "FILE: Cannot open: " << QString(config_filename) << ": " << QString(strerror(errno)) << Qt::endl;
+        return nullptr;
     }
 
-    qInfo() << "File open 1 okay!";
-
-    // Open for reading via QFile
+    // Convert to QFile
     if (false == file.open(file_handle, QIODevice::ReadOnly)) {
-        return -1;
+        qCritical() << "QFile: Cannot open: " << QString(config_filename) << Qt::endl;
+        return nullptr;
     }
 
-    qInfo() << "File open seemed okay!";
-
-    // Dump file contents into input stream
+    // Set the XML input source
     inputSource.setData(file.readAll());
 
-    // Parse with custom content handler
+    // Set the XML content handler
     reader.setContentHandler(&handler);
+
+    // Parser input
     reader.parse(inputSource);
 
-    QVector<std::shared_ptr<SWU::Element>> elements = handler.elementStack();
-    for (auto e : elements) {
-        qCritical() << e->description();
+    // Check handler output
+    if (false == handler.parsed()) {
+        qCritical() << "XML Parse: Failed" << Qt::endl;
+        return nullptr;
     }
-
-    if (handler.parsed()) {
-      qInfo() << "Parse succeeded!";
-    } else {
-        qCritical() << "Parse failed :(";
-        return -1;
-    }
-
-    // Convert to SWUElements
-    QVector<std::shared_ptr<SWU::CFGElement>> cfg_elements(elements.size());
-    for (off_t i = 0; i < elements.count(); ++i) {
-        cfg_elements[i] = std::make_shared<SWU::CFGElement>(SWU::CFGElement(elements[i]));
-    }
-
-    // Run the parser
-    SWU::Parser parser(cfg_elements);
-    if (parser.status() != SWU::PARSE_OK) {
-        qCritical() << "Unable to parse the configuration:\n";
-        std::cerr << parser.fault().toStdString();
-    } else {
-        qCritical() << "The parser said it was successful!";
-    }
-
-
-    // Build software update from token stack
-  //  std::unique_ptr<SWU::Update> swupdate(new SWU::Update(handler.tokenStack()));
 
     // Close the file
     file.close();
-    if (0 != fclose(file_handle)) {
-        return -1;
+
+    // Convert XML elements to SWU ones
+    QVector<std::shared_ptr<SWU::CFGElement>> config_elements;
+    for (auto element : handler.elementStack()) {
+        config_elements.push_back(std::make_shared<SWU::CFGElement>(SWU::CFGElement(element)));
     }
 
-    return 0;
+    // Parse the SWU elements now
+    SWU::Parser parser(config_elements);
+    if (SWU::PARSE_OK != parser.status()) {
+        qCritical() << "SWU Parse: Failed for reason: " << QString(parser.fault()) << Qt::endl;
+        return nullptr;
+    }
+
+    // Create the updater
+    std::shared_ptr<SWU::Updater> updater = std::make_shared<SWU::Updater>(SWU::Updater(parser, delegate));
+
+    // Return updater
+    return updater;
 }
+
+
+/* Class which implements the updater interface */
+class MyUpdateDelegate : public SWU::UpdateDelegate {
+public:
+    SWU::UpdateStatus on_init (SWU::Updater &updater)
+    {
+        qInfo() << "on_init()" << Qt::endl;
+        return SWU::STATUS_OK;
+    }
+
+    SWU::UpdateStatus on_configure_resource_manager (
+            SWU::ResourceManager &resourceManager,
+            QVector<QString> &resource_uris)
+    {
+        qInfo() << "on_configure_resource_manager()" << Qt::endl;
+        for (auto s : resource_uris) {
+            qInfo() << "\t" << s << Qt::endl;
+        }
+        return SWU::STATUS_OK;
+    }
+
+    SWU::UpdateStatus on_pre_validate (std::shared_ptr<SWU::ExpectOperation> op)
+    {
+        qInfo() << "on_pre_validate: " << op->label() << Qt::endl;
+        return SWU::STATUS_OK;
+    }
+
+    SWU::UpdateStatus on_pre_backup (std::shared_ptr<SWU::CopyOperation> op)
+    {
+        qInfo() << "on_pre_backup: " << op->label() << Qt::endl;
+        return SWU::STATUS_OK;
+    }
+
+    SWU::UpdateStatus on_pre_update (std::shared_ptr<SWU::FSOperation> op)
+    {
+        qInfo() << "on_pre_update: " << op->label() << Qt::endl;
+        return SWU::STATUS_OK;
+    }
+
+    SWU::UpdateStatus on_exit (SWU::UpdateStatus status,
+                               std::shared_ptr<SWU::FSOperation> op,
+                               SWU::OperationResult op_result)
+    {
+        qInfo() << "on_exit()" << Qt::endl;
+
+        // If error -> attempt backup
+
+        // If backup fails, then return failure
+        return status;
+    }
+};
+
 
 int main(int argc, char *argv[])
 {
-    int check = -1;
-
     // Check arguments
     if (argc <= 1) {
         qCritical() << "No descriptor XML file provided!";
         return EXIT_FAILURE;
     }
 
-    // Parse the XML into the update class
-    if (-1 == (check = parseSoftwareUpdate(argv[1]))) {
-        qCritical() << "Unable to parse software update XML file provided!";
-        return EXIT_FAILURE;
-    }
+    // Create my update delegate
+    MyUpdateDelegate myDelegate = MyUpdateDelegate();
 
-    // Perform the copy operations
-
+    // Get the updater
+    std::shared_ptr<SWU::Updater> updater = getUpdater(argv[1], myDelegate);
 
     // Make a few operations
 //    QString root("/Users/micrified/Documents/Projects/Qt/root");
