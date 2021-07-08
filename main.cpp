@@ -321,7 +321,17 @@ public:
         d_window->getUI()->progressBar->setValue(advanceStep());
         d_window->getUI()->statusLabel->setText(last_message);
 
+        // Clear the progress bar and product
+        d_window->getUI()->progressBar->setHidden(true);
+        d_window->getUI()->productLabel->setHidden(true);
+
         if (should_stay_onscreen == false) {
+            d_window->getUI()->statusLabel->setText(last_message);
+            for (off_t i = 3; i >= 0; --i) {
+                QString time_label = QString("Returning in %1").arg(i);
+                d_window->getUI()->statusLabel->setText(time_label);
+                QThread::msleep(1000);
+            }
             QApplication::quit();
         }
 
