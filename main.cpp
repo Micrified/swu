@@ -9,13 +9,42 @@
 #include "cfgupdater.h"
 
 #include <QApplication>
+#include <QFileInfo>
 #include <QtXml>
 #include <QThread>
 #include <QStorageInfo>
 #include <iostream>
+#include <memory>
 
 #define STOP_SERVICE_STEP   1
 #define START_SERVICE_STEP  1
+#define PATH_STYLESHEET     "/home/hedon/Hedon/swu/stylesheet.css"
+
+
+/*!
+ * \brief Returns pointer to QString encoded stylesheet
+ * \param path Path to the stylesheet file
+ * \return Stylesheet as a QString
+ */
+static std::unique_ptr<QString> getStyleSheet (const QString path)
+{
+    QFile file(path);
+    QString contents;
+
+    // Validate file
+    if (!(file.exists() )) {
+        qCritical() << "File exists:" << file.exists() << " readable: " << file.isReadable();
+        return nullptr;
+    }
+
+    // Read file contents
+    file.open(QFile::ReadOnly);
+    contents = QLatin1String(file.readAll());
+
+    // Return contents
+    return std::unique_ptr<QString>(new QString(contents));
+}
+
 
 /*!
  * \brief Configures an Updater instance using a configuration file
@@ -23,7 +52,7 @@
  * \param delegate Delegate that will be given to the Updater instance
  * \return
  */
-std::shared_ptr<SWU::Updater> getUpdater (const char *config_filename, SWU::UpdateDelegate &delegate)
+static std::shared_ptr<SWU::Updater> getUpdater (const char *config_filename, SWU::UpdateDelegate &delegate)
 {
     FILE *file_handle;
     QFile file;
@@ -85,12 +114,16 @@ std::shared_ptr<SWU::Updater> getUpdater (const char *config_filename, SWU::Upda
 /* Enable: systemd service */
 static int systemd_service_stop (QString service)
 {
+#ifndef QT_DEBUG
     return QProcess::execute("systemctl", QStringList() << "stop" << service);
+#endif
 }
 
 static bool systemd_service_start (QString service)
 {
+#ifndef QT_DEBUG
     return QProcess::execute("systemctl", QStringList() << "start" << service);
+#endif
 }
 
 /*!
@@ -147,7 +180,7 @@ public:
                         START_SERVICE_STEP;
 
         // Set: pre UI
-        d_window->getUI()->statusLabel->setText("Stopping services");
+        d_window->getUI()->statusLabel->setText("Stopping services ...");
         QThread::msleep(500);
 
         // Stop: Running instances of target to be updated
@@ -177,7 +210,7 @@ public:
         QString search_term, resource_path = nullptr;
 
         // Set: pre UI
-        d_window->getUI()->statusLabel->setText("Locating update resource");
+        d_window->getUI()->statusLabel->setText("Locating update resource ...");
         QThread::msleep(500);
 
         // Peruse connected media
@@ -239,7 +272,7 @@ public:
     {
 
         // Set: pre UI
-        QString label = QString("Verifying existence of: %1").arg(op.get()->label());
+        QString label = QString("Verifying existence of: %1 ...").arg(op.get()->label());
         d_window->getUI()->statusLabel->setText(label);
         QThread::msleep(500);
 
@@ -259,7 +292,7 @@ public:
     SWU::UpdateStatus on_pre_backup (std::shared_ptr<SWU::CopyOperation> op)
     {
         // Set: pre UI
-        QString label = QString("Backing up: %1").arg(op.get()->label());
+        QString label = QString("Backing up: %1 ...").arg(op.get()->label());
         d_window->getUI()->statusLabel->setText(label);
         QThread::msleep(500);
 
@@ -279,7 +312,7 @@ public:
     SWU::UpdateStatus on_pre_update (std::shared_ptr<SWU::FSOperation> op)
     {
         // Set: pre UI
-        QString label = QString("Updating: %1").arg(op.get()->label());
+        QString label = QString("Updating: %1 ...").arg(op.get()->label());
         d_window->getUI()->statusLabel->setText(label);
         QThread::msleep(500);
 
@@ -327,7 +360,7 @@ public:
                     // Set: UI
                     last_message = "Incompatible platform";
                     d_steps = -1;
-                    QThread::msleep(500);
+                    QThread::msleep(1000);
                 }
                 break;
 
@@ -335,14 +368,14 @@ public:
                     // Set: UI
                     last_message = "No update found";
                     d_steps = -1;
-                    QThread::msleep(500);
+                    QThread::msleep(1000);
                 }
                 break;
 
             default: {
                     // Set: UI
                     d_window->getUI()->statusLabel->setText("Exception: restoring ...");
-                    QThread::msleep(500);
+                    QThread::msleep(1000);
 
                     // Adjust final message
                     if (updater.undo() != SWU::STATUS_OK) {
@@ -399,13 +432,11 @@ class WorkThread : public QThread {
 
 private:
     MyUpdateDelegate d_update_delegate; /**< Delegate class that will handle updater events */
-    MainWindow *d_window_p; /**< Pointer to the main window that will be updated */
     std::shared_ptr<SWU::Updater> d_updater; /**< The updater class instance */
 public:
     WorkThread(const char *config_filename, MainWindow *window_p):
         QThread(),
         d_update_delegate(window_p),
-        d_window_p(window_p),
         d_updater(getUpdater(config_filename, d_update_delegate))
     {}
 
@@ -418,14 +449,23 @@ public:
 
 int main(int argc, char *argv[])
 {
+    std::unique_ptr<QString> css;
+
     // Check arguments
     if (argc <= 1) {
         qCritical() << "No descriptor XML file provided!";
         return EXIT_FAILURE;
     }
 
-    // Create application window
+    // Create application
     QApplication a(argc, argv);
+    if (nullptr == (css = getStyleSheet(PATH_STYLESHEET))) {
+        qWarning() << "Unable to read stylesheet: \"" PATH_STYLESHEET "\"";
+    } else {
+        a.setStyleSheet(*css);
+    }
+
+    // Create and show window
     MainWindow w;
     w.show();
 

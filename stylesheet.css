@@ -1,0 +1,65 @@
+QBase {
+
+}
+
+/* General background for Widgets */
+QWidget {
+    background-color: #204a87;
+    color: white;
+}
+
+/* The status label at the top of the screen */
+QLabel[accessibleName="statusLabel"] {
+    font: bold 32px;
+    text-align: center;
+    color: #004579;
+    background-color: #DEDEDE;
+}
+
+/* A warning label that blinks to inform the user not to power off */
+QLabel[accessibleName="warningLabel"] {
+    font: 18px;
+    text-align: center;
+    color: #FFFFFF;
+    background-color: #D0423D;
+}
+
+/* The tag for the application version */
+QLabel[accessibleName="versionLabel"] {
+    font: bold 18px;
+    color: black;
+}
+
+/* The application version itself */
+QLabel[accessibleName="versionValueLabel"] {
+    font: 18px;
+    color: black;
+}
+
+/* The table containing the update steps */
+QTableWidget {
+    font: bold 20px;
+    color: red;
+    border: 0px solid #007BC0;
+    border-radius: 4px;
+    padding: 2px;
+}
+
+/* The progress bar frame */
+QProgressBar {
+    border: 2px solid grey;
+    border-radius: 5px;
+    margin-left: 24px;
+    margin-right: 24px;
+}
+
+/* The progress bar itself */
+QProgressBar::chunk {
+    background-color: #007BC0;
+    width: 50px;
+    margin: 2px;
+}
+
+QWidget::SpinnerWidget {
+    color: #000000
+}

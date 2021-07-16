@@ -274,6 +274,8 @@ static OperationResult copy_file (const QString filename,
         return RESULT_BAD_DESTINATION;
     }
 
+#ifndef QT_DEBUG
+
     // Create the directory if needed
     if (false == destination.exists() && false == destination.mkpath(directory)) {
         qDebug() << " --- Unable to create destination directory" ;
@@ -296,6 +298,10 @@ static OperationResult copy_file (const QString filename,
         return RESULT_BAD_DESTINATION;
     }
 
+#else
+    QThread::msleep(250);
+#endif
+
     return result;
 }
 
@@ -310,8 +316,6 @@ static OperationResult copy_directory (const QString dirname, const QString dire
         return RESULT_BAD_RESOURCE;
     }
 
-    qDebug() << " A " ;
-
     // Check if the destination directory exists
     const QDir destination(directory);
     if (false == destination.exists() && false == force) {
@@ -319,7 +323,7 @@ static OperationResult copy_directory (const QString dirname, const QString dire
         return RESULT_BAD_DESTINATION;
     }
 
-    qDebug() << " B " ;
+#ifndef QT_DEBUG
 
     // Create destination directory name
     qDebug() << "Source.dirname() = " << source.dirName() ;
@@ -332,8 +336,6 @@ static OperationResult copy_directory (const QString dirname, const QString dire
     } else {
         qDebug() << " --- Created: " << new_destination.path() ;
     }
-
-    qDebug() << " C " ;
 
     // Copy the directory (recursive - perhaps unwise with limited stack)
     const QFlags<QDir::Filter> flags = QDir::Filter::Dirs | QDir::Filter::Files | QDir::Filter::NoSymLinks |
@@ -354,7 +356,9 @@ static OperationResult copy_directory (const QString dirname, const QString dire
         }
     }
 
-    qDebug() << " D " ;
+#else
+    QThread::msleep(250);
+#endif
 
     return RESULT_OK;
 }
@@ -368,10 +372,16 @@ static OperationResult remove_file (const QString filename)
         return RESULT_BAD_RESOURCE;
     }
 
+#ifndef QT_DEBUG
+
     // Remove file
     if (false == QFile::remove(filename)) {
         return RESULT_BAD_RESOURCE;
     }
+
+#else
+    QThread::msleep(250);
+#endif
 
     return RESULT_OK;
 }
@@ -385,10 +395,16 @@ static OperationResult remove_directory (const QString dirname)
         return RESULT_BAD_RESOURCE;
     }
 
+#ifndef QT_DEBUG
+
     // Remove directory
     if (false == directory.removeRecursively()) {
         return RESULT_BAD_RESOURCE;
     }
+
+#else
+    QThread::msleep(250);
+#endif
 
     return RESULT_OK;
 }

@@ -3,6 +3,7 @@
 
 #include <QString>
 #include <QDebug>
+#include <QThread>
 #include <memory>
 #include "resource.h"
 #include "resource_manager.h"
