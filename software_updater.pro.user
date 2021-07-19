@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE QtCreatorProject>
-<!-- Written by QtCreator 4.15.0, 2021-07-19T10:05:21. -->
+<!-- Written by QtCreator 4.15.0, 2021-07-19T14:11:55. -->
 <qtcreator>
  <data>
   <variable>EnvironmentId</variable>
@@ -297,7 +297,7 @@
     <valuelist type="QVariantList" key="PE.EnvironmentAspect.Changes"/>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">Qt4ProjectManager.Qt4RunConfiguration:/home/hedon/Hedon/swu/software_updater.pro</value>
     <value type="QString" key="ProjectExplorer.RunConfiguration.BuildKey">/home/hedon/Hedon/swu/software_updater.pro</value>
-    <value type="QString" key="RunConfiguration.Arguments">/home/hedon/Hedon/swu/update_config.xml</value>
+    <value type="QString" key="RunConfiguration.Arguments">/home/hedon/Hedon/swu/update_config.xml /home/hedon/Hedon/swu/stylesheet.css</value>
     <value type="bool" key="RunConfiguration.UseCppDebugger">false</value>
     <value type="bool" key="RunConfiguration.UseCppDebuggerAuto">true</value>
     <value type="bool" key="RunConfiguration.UseLibrarySearchPath">true</value>

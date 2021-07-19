@@ -1,6 +1,3 @@
-QBase {
-
-}
 
 /* General background for Widgets */
 QWidget {
@@ -36,30 +33,24 @@ QLabel[accessibleName="versionValueLabel"] {
     color: black;
 }
 
-/* The table containing the update steps */
-QTableWidget {
-    font: bold 20px;
-    color: red;
-    border: 0px solid #007BC0;
-    border-radius: 4px;
-    padding: 2px;
-}
-
 /* The progress bar frame */
 QProgressBar {
-    border: 2px solid grey;
+    color: #FFFFFF;
+    border: 2px solid white;
     border-radius: 5px;
     margin-left: 24px;
     margin-right: 24px;
+    text-align: center;
+}
+
+QProgressBar::text:highlight {
+    color: #204a87;
 }
 
 /* The progress bar itself */
 QProgressBar::chunk {
-    background-color: #007BC0;
-    width: 50px;
-    margin: 2px;
-}
-
-QWidget::SpinnerWidget {
-    color: #000000
+    color: #204a87;
+    background-color: #FFFFFF;
+    width: 24px;
+/*    margin: 2px;*/
 }

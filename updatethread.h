@@ -14,6 +14,8 @@ public:
     ~UpdateThread();
     void initUI(const QString productLabel, const QString statusLabel);
     void setStatus (const QString statusLabel);
+    void setProduct (const QString productLabel);
+    void setProgress (int progressValue);
     void updateUI(const QString statusLabel, int progressValue);
 signals:
     void setUI(const QString productLabel,

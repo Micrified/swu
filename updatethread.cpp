@@ -26,6 +26,18 @@ void UpdateThread::setStatus(const QString statusLabel)
     emit setUI(d_productLabel, d_statusLabel, d_progressValue);
 }
 
+void UpdateThread::setProduct(const QString productLabel)
+{
+    d_productLabel = productLabel;
+    emit setUI(d_productLabel, d_statusLabel, d_progressValue);
+}
+
+void UpdateThread::setProgress(int progressValue)
+{
+    d_progressValue = progressValue;
+    emit setUI(d_productLabel, d_statusLabel, d_progressValue);
+}
+
 void UpdateThread::updateUI(const QString statusLabel,
                             int progressValue)
 {

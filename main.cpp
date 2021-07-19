@@ -19,7 +19,6 @@
 
 #define STOP_SERVICE_STEP   1
 #define START_SERVICE_STEP  1
-#define PATH_STYLESHEET     "/home/hedon/Hedon/swu/stylesheet.css"
 
 
 /*!
@@ -230,7 +229,6 @@ public:
             SWU::ResourceManager &resourceManager,
             QVector<QString> &resource_uris) override
     {
-        QString productLabel;
         QString statusLabel;
         int progressValue;
         QString search_term, resource_path = nullptr;
@@ -241,15 +239,15 @@ public:
         QThread::msleep(500);
 
         // Peruse connected media
-        for (const QStorageInfo &storage : QStorageInfo::mountedVolumes()) {
+        foreach(const QStorageInfo &storage, QStorageInfo::mountedVolumes()) {
 
             // Update: UI
-            statusLabel = QString("Scanning %1 ...").arg(storage.rootPath());
+            statusLabel = QString("Scanning %1 for %2 ...").arg(storage.rootPath(), d_product_id);
             setStatus(statusLabel);
             QThread::msleep(250);
 
             // Check if the storage name is found in the list of expected resource URIs
-            for (auto uri : resource_uris) {
+            foreach (const QString &uri, resource_uris) {
                 if (storage.rootPath().contains(uri, Qt::CaseInsensitive)) {
                     resource_path = storage.rootPath();
                     break;
@@ -412,7 +410,7 @@ public:
 
         // Display status with delay
         updateUI(statusLabel, progressValue);
-        QThread::msleep(500);
+        QThread::msleep(1000);
 
         // Recover (if required)
         if (shouldRecover) {
@@ -443,7 +441,7 @@ public:
             // Countdown to return
             for (off_t i = 3; i >= 0; --i) {
                 statusLabel = QString("Returning in %1").arg(i);
-                setStatus(statusLabel);
+                setProduct(statusLabel);
                 QThread::msleep(1000);
             }
 
@@ -479,10 +477,15 @@ int main(int argc, char *argv[])
 
     // Create application
     QApplication a(argc, argv);
-    if (nullptr == (css = getStyleSheet(PATH_STYLESHEET))) {
-        qWarning() << "Unable to read stylesheet: \"" PATH_STYLESHEET "\"";
+    if (argc > 2) {
+        if ((nullptr == (css = getStyleSheet(argv[2])))) {
+            qWarning() << "Unable to read stylesheet: \"" << QString(argv[2])
+                       << "\"";
+        } else {
+            a.setStyleSheet(*css);
+        }
     } else {
-        a.setStyleSheet(*css);
+        qInfo() << "No stylesheet provided";
     }
 
     // Get the parser
