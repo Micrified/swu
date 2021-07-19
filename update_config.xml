@@ -7,12 +7,14 @@
         <file>frontend</file>
         <file>backend</file>
         <file>updater</file>
+        <file>update_config.xml</file>
     </validate>
 
     <backup path="/tmp/backup">
         <file>/opt/tradinco-hmi/frontend</file>
         <file>/opt/tradinco-hmi/backend</file>
         <file>/opt/tradinco-hmi/updater</file>
+        <file>/opt/tradinco-hmi/update_config.xml</file>
     </backup>
 
     <operations>
@@ -26,6 +28,10 @@
         </copy>
         <copy>
             <from root="Remote">updater</from>
+            <to root="Target">/opt/tradinco-hmi</to>
+        </copy>
+        <copy>
+            <from root="Remote">update_config.xml</from>
             <to root="Target">/opt/tradinco-hmi</to>
         </copy>
     </operations>
