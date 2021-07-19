@@ -21,7 +21,8 @@ SOURCES += \
     mainwindow.cpp \
  \    #update.cpp
     resource.cpp \
-    resource_manager.cpp
+    resource_manager.cpp \
+    updatethread.cpp
 
 HEADERS += \
     attributes.h \
@@ -35,7 +36,8 @@ HEADERS += \
     mainwindow.h \
  \    #update.h
     resource.h \
-    resource_manager.h
+    resource_manager.h \
+    updatethread.h
 
 FORMS += \
     mainwindow.ui

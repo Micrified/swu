@@ -18,18 +18,21 @@ UpdateStatus UpdateDelegate::on_configure_resource_manager (
     Q_UNUSED(resource_uris);
     return STATUS_OK;
 }
-UpdateStatus UpdateDelegate::on_pre_validate (std::shared_ptr<ExpectOperation> op)
+UpdateStatus UpdateDelegate::on_pre_validate (std::shared_ptr<ExpectOperation> op, off_t index)
 {
+    Q_UNUSED(op);
     Q_UNUSED(op);
     return STATUS_OK;
 }
-UpdateStatus UpdateDelegate::on_pre_backup (std::shared_ptr<CopyOperation> op)
+UpdateStatus UpdateDelegate::on_pre_backup (std::shared_ptr<CopyOperation> op, off_t index)
 {
+    Q_UNUSED(op);
     Q_UNUSED(op);
     return STATUS_OK;
 }
-UpdateStatus UpdateDelegate::on_pre_update (std::shared_ptr<FSOperation> op)
+UpdateStatus UpdateDelegate::on_pre_update (std::shared_ptr<FSOperation> op, off_t index)
 {
+    Q_UNUSED(op);
     Q_UNUSED(op);
     return STATUS_OK;
 }
@@ -44,30 +47,30 @@ UpdateStatus UpdateDelegate::on_exit (SWU::Updater &updater,
     return STATUS_OK;
 }
 
-Updater::Updater(Parser &parser, UpdateDelegate &delegate):
+Updater::Updater(std::shared_ptr<SWU::Parser> parser, UpdateDelegate &delegate):
     d_status(STATUS_OK),
     d_update_delegate(delegate),
-    d_product(parser.product()),
-    d_platform(parser.platform()),
-    d_resource_uris(parser.resource_uris()),
-    d_backup_path(parser.backup_path()),
+    d_product(parser->product()),
+    d_platform(parser->platform()),
+    d_resource_uris(parser->resource_uris()),
+    d_backup_path(parser->backup_path()),
     d_validate_sp(0),
     d_backup_sp(0),
     d_update_sp(0)
 {
     // Set: Validate operations
-    for (off_t i = 0; i < parser.validate_operations().length(); ++i) {
-        d_validate_operations.push_back(parser.validate_operations().at(i));
+    for (off_t i = 0; i < parser->validate_operations().length(); ++i) {
+        d_validate_operations.push_back(parser->validate_operations().at(i));
     }
 
     // Set: Backup operations
-    for (off_t i = 0; i < parser.backup_operations().length(); ++i) {
-        d_backup_operations.push_back(parser.backup_operations().at(i));
+    for (off_t i = 0; i < parser->backup_operations().length(); ++i) {
+        d_backup_operations.push_back(parser->backup_operations().at(i));
     }
 
     // Set: Update operations
-    for (off_t i = 0; i < parser.update_operations().length(); ++i) {
-        d_update_operations.push_back(parser.update_operations().at(i));
+    for (off_t i = 0; i < parser->update_operations().length(); ++i) {
+        d_update_operations.push_back(parser->update_operations().at(i));
     }
 }
 
@@ -101,7 +104,7 @@ UpdateStatus Updater::execute()
                 std::dynamic_pointer_cast<ExpectOperation>(d_validate_operations.at(d_validate_sp));
 
         // Precondition
-        if ((retval = d.on_pre_validate(e)) != STATUS_OK) {
+        if ((retval = d.on_pre_validate(e, d_validate_sp)) != STATUS_OK) {
             return d_update_delegate.on_exit(*this, STATUS_BAD_PRECONDITION, e);
         }
 
@@ -120,7 +123,7 @@ UpdateStatus Updater::execute()
                 std::dynamic_pointer_cast<CopyOperation>(d_backup_operations.at(d_backup_sp));
 
         // Precondition
-        if ((retval = d.on_pre_backup(c)) != STATUS_OK) {
+        if ((retval = d.on_pre_backup(c, d_backup_sp)) != STATUS_OK) {
             return d_update_delegate.on_exit(*this, STATUS_BAD_PRECONDITION, c);
         }
 
@@ -138,7 +141,7 @@ UpdateStatus Updater::execute()
         std::shared_ptr<FSOperation> op = d_update_operations.at(d_update_sp);
 
         // Precondition
-        if ((retval = d.on_pre_update(op)) != STATUS_OK) {
+        if ((retval = d.on_pre_update(op, d_update_sp)) != STATUS_OK) {
             return d_update_delegate.on_exit(*this, STATUS_BAD_PRECONDITION, op);
         }
 

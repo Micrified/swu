@@ -7,6 +7,7 @@
 #include "cfgelement.h"
 #include "cfgparser.h"
 #include "cfgupdater.h"
+#include "updatethread.h"
 
 #include <QApplication>
 #include <QFileInfo>
@@ -52,7 +53,7 @@ static std::unique_ptr<QString> getStyleSheet (const QString path)
  * \param delegate Delegate that will be given to the Updater instance
  * \return
  */
-static std::shared_ptr<SWU::Updater> getUpdater (const char *config_filename, SWU::UpdateDelegate &delegate)
+static std::shared_ptr<SWU::Parser> getParser (const char *config_filename)
 {
     FILE *file_handle;
     QFile file;
@@ -97,33 +98,37 @@ static std::shared_ptr<SWU::Updater> getUpdater (const char *config_filename, SW
     }
 
     // Parse the SWU elements now
-    SWU::Parser parser(config_elements);
-    if (SWU::PARSE_OK != parser.status()) {
-        qCritical() << "SWU Parse: Failed for reason: " << QString(parser.fault()) ;
+    std::shared_ptr<SWU::Parser> parser = std::make_shared<SWU::Parser>(config_elements);
+    if (SWU::PARSE_OK != parser->status()) {
+        qCritical() << "SWU Parse: Failed for reason: " << QString(parser->fault()) ;
         return nullptr;
+    } else {
+        return parser;
     }
-
-    // Create the updater
-    std::shared_ptr<SWU::Updater> updater = std::make_shared<SWU::Updater>(SWU::Updater(parser, delegate));
-
-    // Return updater
-    return updater;
 }
 
 
 /* Enable: systemd service */
-static int systemd_service_stop (QString service)
+static bool systemd_service_stop (QString service)
 {
+    bool retval = true;
 #ifndef QT_DEBUG
-    return QProcess::execute("systemctl", QStringList() << "stop" << service);
+    retval = QProcess::execute("systemctl", QStringList() << "stop" << service);
+#else
+    Q_UNUSED(service);
 #endif
+    return retval;
 }
 
 static bool systemd_service_start (QString service)
 {
+    bool retval = true;
 #ifndef QT_DEBUG
-    return QProcess::execute("systemctl", QStringList() << "start" << service);
+    retval = QProcess::execute("systemctl", QStringList() << "start" << service);
+#else
+    Q_UNUSED(service);
 #endif
+    return retval;
 }
 
 /*!
@@ -134,15 +139,20 @@ static bool systemd_service_start (QString service)
  * resource URI to the updater, perform pre and post update actions, and optionally
  * taking action on backup, update, and validate operations.
  */
-class MyUpdateDelegate : public SWU::UpdateDelegate {
+class MyUpdaterThread : public UpdateThread, public SWU::UpdateDelegate {
 private:
-    MainWindow* d_window; /**< Pointer to the window to be updated */
+    std::shared_ptr<SWU::Updater> d_updater_ptr;
     off_t d_steps, d_total_steps; /**< Update progress is tracked using steps */
     QString d_product_id; /**< An example field used to hold a generated product ID string */
 public:
-    MyUpdateDelegate(MainWindow *w):
-        d_window(w)
-    {}
+    MyUpdaterThread(std::shared_ptr<SWU::Parser> parser, QObject *parent = nullptr):
+        UpdateThread(parent),
+        d_updater_ptr(nullptr)
+    {
+
+        // Init the updater
+        d_updater_ptr = std::make_shared<SWU::Updater>(parser, *this);
+    }
 
     /*!
      * \brief Increments the step counter
@@ -153,6 +163,11 @@ public:
         if (d_steps < d_total_steps) {
             d_steps++;
         }
+        return step();
+    }
+
+    int step ()
+    {
         float real = (float)d_steps / (float)d_total_steps * 100.0;
         int natural = (int)ceil(real);
         return natural;
@@ -164,23 +179,30 @@ public:
      * \param updater A reference to the updater object
      * \return STATUS_OK if the updater should continue, else error status.
      */
-    SWU::UpdateStatus on_init (SWU::Updater &updater)
+    SWU::UpdateStatus on_init (SWU::Updater &updater) override
     {
+        QString productLabel;
+        QString statusLabel;
+        int progressValue;
+
         // Set: product label (shown onscreen)
-        d_window->getUI()->productLabel->setText(updater.product());
+        productLabel = updater.product();
+        statusLabel  = "Starting updater ...";
+        initUI(productLabel, statusLabel);
 
         // Set: product ID (custom ID generated using product and platform)
         QString product_id = QString("%1 %2").arg(updater.product(), updater.platform());
         d_product_id = product_id.replace(" ", "_").toLower();
 
-        // Set: progress bar value
+        // Init progress tracking
         d_steps = 0;
         d_total_steps = updater.operationCount() +
                         STOP_SERVICE_STEP +
                         START_SERVICE_STEP;
 
-        // Set: pre UI
-        d_window->getUI()->statusLabel->setText("Stopping services ...");
+        // Set: UI for stopping services
+        statusLabel = "Stopping services ...";
+        setStatus(statusLabel);
         QThread::msleep(500);
 
         // Stop: Running instances of target to be updated
@@ -191,8 +213,9 @@ public:
             qInfo() << "Notice: Failed to stop frontend, continuing anyways";
         }
 
-        // Set: post UI
-        d_window->getUI()->progressBar->setValue(advanceStep());
+        // Set: final UI
+        progressValue = advanceStep();
+        updateUI(statusLabel, progressValue);
 
         return SWU::STATUS_OK;
     }
@@ -205,19 +228,24 @@ public:
      */
     SWU::UpdateStatus on_configure_resource_manager (
             SWU::ResourceManager &resourceManager,
-            QVector<QString> &resource_uris)
+            QVector<QString> &resource_uris) override
     {
+        QString productLabel;
+        QString statusLabel;
+        int progressValue;
         QString search_term, resource_path = nullptr;
 
         // Set: pre UI
-        d_window->getUI()->statusLabel->setText("Locating update resource ...");
+        statusLabel = "Locating update resource ...";
+        setStatus(statusLabel);
         QThread::msleep(500);
 
         // Peruse connected media
         for (const QStorageInfo &storage : QStorageInfo::mountedVolumes()) {
 
             // Update: UI
-            d_window->getUI()->statusLabel->setText(QString("Scanning %1").arg(storage.rootPath()));
+            statusLabel = QString("Scanning %1 ...").arg(storage.rootPath());
+            setStatus(statusLabel);
             QThread::msleep(250);
 
             // Check if the storage name is found in the list of expected resource URIs
@@ -252,7 +280,8 @@ public:
         }
 
         // Set: post UI
-        d_window->getUI()->progressBar->setValue(advanceStep());
+        progressValue = advanceStep();
+        updateUI(statusLabel, progressValue);
 
         // If resource path found, then assign to resource manager.
         if (resource_path != nullptr) {
@@ -268,18 +297,22 @@ public:
      * \param op The validate operation
      * \return STATUS_OK if the updater should continue, else error status
      */
-    SWU::UpdateStatus on_pre_validate (std::shared_ptr<SWU::ExpectOperation> op)
+    SWU::UpdateStatus on_pre_validate (std::shared_ptr<SWU::ExpectOperation> op, off_t index) override
     {
+        QString statusLabel;
+        int progressValue;
 
         // Set: pre UI
-        QString label = QString("Verifying existence of: %1 ...").arg(op.get()->label());
-        d_window->getUI()->statusLabel->setText(label);
+        statusLabel = QString("Verifying %1 ...").arg(index);
+        setStatus(statusLabel);
         QThread::msleep(500);
 
-        // Unimplemented
+        // Unimplemented (do whatever checks here)
+        Q_UNUSED(op);
 
         // Set: post UI
-        d_window->getUI()->progressBar->setValue(advanceStep());
+        progressValue = advanceStep();
+        updateUI(statusLabel, progressValue);
 
         return SWU::STATUS_OK;
     }
@@ -289,17 +322,22 @@ public:
      * \param op The backup operation
      * \return STATUS_OK if the updater should continue, else error status
      */
-    SWU::UpdateStatus on_pre_backup (std::shared_ptr<SWU::CopyOperation> op)
+    SWU::UpdateStatus on_pre_backup (std::shared_ptr<SWU::CopyOperation> op, off_t index) override
     {
+        QString statusLabel;
+        int progressValue;
+
         // Set: pre UI
-        QString label = QString("Backing up: %1 ...").arg(op.get()->label());
-        d_window->getUI()->statusLabel->setText(label);
+        statusLabel = QString("Backing up %1 ...").arg(index);
+        setStatus(statusLabel);
         QThread::msleep(500);
 
-        // Unimplemented
+        // Unimplemented (do whatever checks here)
+        Q_UNUSED(op);
 
         // Set: post UI
-        d_window->getUI()->progressBar->setValue(advanceStep());
+        progressValue = advanceStep();
+        updateUI(statusLabel, progressValue);
 
         return SWU::STATUS_OK;
     }
@@ -309,17 +347,22 @@ public:
      * \param op The update operation (either a copy or remove)
      * \return STATUS_OK if the updater should continue, else error status
      */
-    SWU::UpdateStatus on_pre_update (std::shared_ptr<SWU::FSOperation> op)
+    SWU::UpdateStatus on_pre_update (std::shared_ptr<SWU::FSOperation> op, off_t index) override
     {
+        QString statusLabel;
+        int progressValue;
+
         // Set: pre UI
-        QString label = QString("Updating: %1 ...").arg(op.get()->label());
-        d_window->getUI()->statusLabel->setText(label);
+        statusLabel = QString("Updating %1 ...").arg(index);
+        setStatus(statusLabel);
         QThread::msleep(500);
 
-        // Unimplemented
+        // Unimplemented (do whatever checks here)
+        Q_UNUSED(op);
 
         // Set: post UI
-        d_window->getUI()->progressBar->setValue(advanceStep());
+        progressValue = advanceStep();
+        updateUI(statusLabel, progressValue);
 
         return SWU::STATUS_OK;
     }
@@ -337,112 +380,89 @@ public:
     SWU::UpdateStatus on_exit (SWU::Updater &updater,
                                SWU::UpdateStatus status,
                                std::shared_ptr<SWU::FSOperation> op,
-                               SWU::OperationResult op_result)
+                               SWU::OperationResult op_result) override
     {
         Q_UNUSED(op);
         Q_UNUSED(op_result);
+        QString statusLabel;
+        int progressValue = step();
+        bool shouldTerminate = true;
+        bool shouldRecover = false;
 
-        // Message to leave on screen last
-        QString last_message = "Update complete";
-
-        // Whether or not to stay on screen (default no)
-        bool should_stay_onscreen = false;
-
-        // Status switch
         switch (status) {
-            case SWU::STATUS_OK: {
-                    // Set: UI
-                    d_window->getUI()->statusLabel->setText("Restarting services");
-                    QThread::msleep(500);
-                }
+            case SWU::STATUS_OK:
+                statusLabel = "Restarting services ...";
                 break;
-            case SWU::STATUS_BAD_PLATFORM: {
-                    // Set: UI
-                    last_message = "Incompatible platform";
-                    d_steps = -1;
-                    QThread::msleep(1000);
-                }
+            case SWU::STATUS_BAD_PLATFORM:
+                statusLabel = "Incompatible platform!";
+                progressValue = -1;
                 break;
 
-            case SWU::STATUS_RESOURCE_NOT_FOUND: {
-                    // Set: UI
-                    last_message = "No update found";
-                    d_steps = -1;
-                    QThread::msleep(1000);
-                }
+            case SWU::STATUS_RESOURCE_NOT_FOUND:
+                statusLabel = "No update found!";
+                progressValue = -1;
                 break;
 
-            default: {
-                    // Set: UI
-                    d_window->getUI()->statusLabel->setText("Exception: restoring ...");
-                    QThread::msleep(1000);
-
-                    // Adjust final message
-                    if (updater.undo() != SWU::STATUS_OK) {
-                        last_message = "Fatal exception: contact support";
-                        should_stay_onscreen = true;
-                    } else {
-                        last_message = "Restored from backup successfully";
-                    }
-
-                    // Reset progress
-                    d_steps = -1;
-                }
+            default:
+                statusLabel = "Recovering from exception ...";
+                progressValue = -1;
+                shouldRecover = true;
                 break;
         }
 
-        // Restart services (only if update restore didn't fail)
-        if (should_stay_onscreen == false) {
+        // Display status with delay
+        updateUI(statusLabel, progressValue);
+        QThread::msleep(500);
+
+        // Recover (if required)
+        if (shouldRecover) {
+            if (SWU::STATUS_OK != updater.undo()) {
+                statusLabel = "Unable to recover. Contact support!";
+                shouldTerminate = false;
+            } else {
+                statusLabel = "Recovered from backup successfully!";
+            }
+
+            // Display status with delay
+            updateUI(statusLabel, progressValue);
+            QThread::msleep(500);
+        }
+
+
+        // On terminate condition
+        if (shouldTerminate) {
+
+            // Restart services
             if (systemd_service_start("backend.service")) {
                 qCritical() << "Failed to start backend, continuing anyways";
             }
             if (systemd_service_start("frontend.service")) {
                 qCritical() << "Failed to start frontend, continuing anyways";
             }
-        }
 
-        // Set post UI
-        d_window->getUI()->progressBar->setValue(advanceStep());
-        d_window->getUI()->statusLabel->setText(last_message);
-
-        // Clear the progress bar and product
-        d_window->getUI()->progressBar->setHidden(true);
-        d_window->getUI()->productLabel->setHidden(true);
-
-        // Run countdown to quit, if applicable
-        if (should_stay_onscreen == false) {
-            d_window->getUI()->statusLabel->setText(last_message);
+            // Countdown to return
             for (off_t i = 3; i >= 0; --i) {
-                QString time_label = QString("Returning in %1").arg(i);
-                d_window->getUI()->statusLabel->setText(time_label);
+                statusLabel = QString("Returning in %1").arg(i);
+                setStatus(statusLabel);
                 QThread::msleep(1000);
             }
-            QApplication::quit();
+
+            // Return OK (quit condition)
+            return SWU::STATUS_OK;
         }
 
+        // Else stay onscreen
         return status;
     }
-};
 
-/*!
- * \brief The work-thread executes the update procedure in the background, occasionally
- * pushing updates to the main UI thread
- */
-class WorkThread : public QThread {
+    void run() override {
 
-private:
-    MyUpdateDelegate d_update_delegate; /**< Delegate class that will handle updater events */
-    std::shared_ptr<SWU::Updater> d_updater; /**< The updater class instance */
-public:
-    WorkThread(const char *config_filename, MainWindow *window_p):
-        QThread(),
-        d_update_delegate(window_p),
-        d_updater(getUpdater(config_filename, d_update_delegate))
-    {}
-
-    void run() override
-    {
-        d_updater->execute();
+        // If executed successfully, then quit.
+        if (SWU::STATUS_OK == d_updater_ptr->execute()) {
+            QApplication::quit();
+        } else {
+            QThread::wait(QDeadlineTimer::Forever);
+        }
     }
 };
 
@@ -465,12 +485,21 @@ int main(int argc, char *argv[])
         a.setStyleSheet(*css);
     }
 
+    // Get the parser
+    std::shared_ptr<SWU::Parser> parser = getParser(argv[1]);
+    if (nullptr == parser) {
+        return EXIT_FAILURE;
+    }
+
+    // Create the updater thread
+    MyUpdaterThread updaterThread(parser);
+
     // Create and show window
-    MainWindow w;
+    MainWindow w(updaterThread);
     w.show();
 
     // Run the update routine
-    WorkThread updateWorkThread(argv[1], &w);
-    updateWorkThread.start();
+    updaterThread.start();
+
     return a.exec();
 }

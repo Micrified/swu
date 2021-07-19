@@ -40,11 +40,11 @@ public:
             ResourceManager &resourceManager,
             QVector<QString> &resource_uris) = 0;
 
-    virtual UpdateStatus on_pre_validate (std::shared_ptr<ExpectOperation> op) = 0;
+    virtual UpdateStatus on_pre_validate (std::shared_ptr<ExpectOperation> op, off_t index) = 0;
 
-    virtual UpdateStatus on_pre_backup (std::shared_ptr<CopyOperation> op) = 0;
+    virtual UpdateStatus on_pre_backup (std::shared_ptr<CopyOperation> op, off_t index) = 0;
 
-    virtual UpdateStatus on_pre_update (std::shared_ptr<FSOperation> op) = 0;
+    virtual UpdateStatus on_pre_update (std::shared_ptr<FSOperation> op, off_t index) = 0;
 
     virtual UpdateStatus on_exit (SWU::Updater &updater,
                                   UpdateStatus status,
@@ -83,7 +83,7 @@ private:
     QVector<std::shared_ptr<SWU::FSOperation>> d_update_operations;
 
 public:
-    Updater(SWU::Parser &parser, SWU::UpdateDelegate &delegate);
+    Updater(std::shared_ptr<SWU::Parser> parser, SWU::UpdateDelegate &delegate);
     UpdateStatus execute ();
     UpdateStatus undo ();
     off_t validate_sp ();
